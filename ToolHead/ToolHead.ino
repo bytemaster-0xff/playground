@@ -3,7 +3,7 @@
 #define IN2 8
 #define IN3 9
 #define IN4 7
-#define DELAY_MICRO_SECONDS 2000
+#define DELAY_MICRO_SECONDS 5000
 #define MAX_LIMIT 5
 #define MIN_LIMIT 4
 
@@ -54,17 +54,16 @@ int _intCmd;
 byte _commandBufferHead;
 byte _commandBufferTail;
 
-struct GCodeCommand
+typedef struct GCodeCommand
 {
 	CommandTypes CommandType;
 	byte Command;
 	float ZLocation;
 	float Feed;
-};
+} GCodeCommand_t;
 
 
-
-GCodeCommand CommandBuffer[COMMAND_BUFFER_LENGTH];
+GCodeCommand_t CommandBuffer[COMMAND_BUFFER_LENGTH];
 
 float _zLocation;
 
@@ -150,37 +149,23 @@ void ParseWord()
 		return;
 	}
 
-	Serial.print("Process Word: ");
-	Serial.println(wordBuffer);
-
 	switch (_wordType)
 	{
 	case ExpectingMCode:
 		CommandBuffer[_commandBufferHead].CommandType = MCode;
-		Serial.print("MCODE Command Type: ");
-		Serial.println(wordBuffer);
 		CommandBuffer[_commandBufferHead].Command = atoi(wordBuffer);
 		break;
-	case ExpectingGCode:		
-		Serial.print("GCODE Command Type: ");
-		Serial.println(wordBuffer);
+	case ExpectingGCode:
 		CommandBuffer[_commandBufferHead].CommandType = GCode;
 		CommandBuffer[_commandBufferHead].Command = atoi(wordBuffer);
 		break;
 	case ExpectingFeed:
-		Serial.print("FEED: ");
 		CommandBuffer[_commandBufferHead].Feed = atof(wordBuffer);
 		break;
 	case ExpectingZLocation:
-		Serial.print("ZLOCATION: ");
 		CommandBuffer[_commandBufferHead].ZLocation = atof(wordBuffer);
-		Serial.print(CommandBuffer[_commandBufferHead].ZLocation, 4);
-		Serial.print(" ");
-		Serial.println(wordBuffer);
 		break;
 	}
-
-	Serial.println();
 
 	_parserState = ExpectingWordType;
 	_wordType = NotSpecified;
@@ -197,8 +182,8 @@ void GetCommand()
 		return;
 	}
 
-	Serial.print("IN LOOP: ");
-	Serial.println((char) ch);
+	//	Serial.print("IN LOOP: ");
+		//Serial.println((char) ch);
 
 	if (ch == '?')
 	{
@@ -232,21 +217,15 @@ void GetCommand()
 				bufferIndex = 0;
 			}
 		}
-	}	
+	}
 
-	/* Set the Feed and Z Location to the prior GCode Command */	
-
-	Serial.print("LEN ");
-	Serial.println(bufferIndex);
+	/* Set the Feed and Z Location to the prior GCode Command */
 
 	bool completedCommand = false;
 	bool invalidCommand = false;
 	/* Go through the entire list and parse out values...likely not that strong*/
 	while (parserIndex < bufferIndex)
 	{
-		Serial.print("Parsing: ");
-		Serial.print((char)buffer[parserIndex]);
-		Serial.println(' ');
 		switch (buffer[parserIndex])
 		{
 		case '\n':
@@ -256,22 +235,15 @@ void GetCommand()
 		case ' ':
 			ParseWord();
 			_parserState = PendingNextWord;
-			Serial.println("Space Skip");
 			break;
 
-		case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '9': case '.':
+		case '-': case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': case '.':
 			wordBuffer[wordBufferIndex++] = buffer[parserIndex];
-			Serial.print("WORD BUFFER: ");
-			Serial.print(wordBufferIndex);
-			Serial.print("=>");
-			Serial.print(wordBuffer);
-			Serial.println("<=");
 			break;
 		case 'Z':
 			ParseWord();
 			_wordType = ExpectingZLocation;
 			_parserState = PendingNextWord;
-			Serial.println("Expect Z");
 			break;
 		case 'F':
 			ParseWord();
@@ -292,7 +264,7 @@ void GetCommand()
 		{
 			Serial.println("<error:002>");
 			return;
-		}	
+		}
 	}
 
 	if (invalidCommand)
@@ -333,25 +305,94 @@ void GetCommand()
 	}
 }
 
+void Up() {
+	phase4();
+	delayMicroseconds(DELAY_MICRO_SECONDS);
+	phase3();
+	delayMicroseconds(DELAY_MICRO_SECONDS);
+	phase2();
+	delayMicroseconds(DELAY_MICRO_SECONDS);
+	phase1();
+	delayMicroseconds(DELAY_MICRO_SECONDS);
+}
+
+void Down() {
+	phase1();
+	delayMicroseconds(DELAY_MICRO_SECONDS);
+	phase2();
+	delayMicroseconds(DELAY_MICRO_SECONDS);
+	phase3();
+	delayMicroseconds(DELAY_MICRO_SECONDS);
+	phase4();
+	delayMicroseconds(DELAY_MICRO_SECONDS);
+}
+
+
+#define STEP_PER_CM 10
+
 void ProcessCommand()
 {
-	Serial.print("Processing Command Type: ");
 	switch (CommandBuffer[_commandBufferTail].CommandType)
 	{
-		case MCode: Serial.print("MCODE "); break;
-		case GCode: Serial.print("GCODE "); break;
-	}
+		case GCode:
+		{
+			switch (CommandBuffer[_commandBufferTail].Command)
+			{
+			case 0:
+			case 1: {
+				float delta = CommandBuffer[_commandBufferTail].ZLocation - _zLocation;
 
-	Serial.print(CommandBuffer[_commandBufferTail].Command);
-	Serial.print(" Z");
-	Serial.print(CommandBuffer[_commandBufferTail].ZLocation, 4);
-	Serial.print(" F");
-	Serial.print(CommandBuffer[_commandBufferTail].Feed, 4);
-	Serial.print('\n');
+				int stepCount = abs(delta * STEP_PER_CM);
+				Serial.println(CommandBuffer[_commandBufferTail].ZLocation);
+				Serial.println(delta);
+				Serial.println(stepCount);
+
+				if (delta > 0) {
+					while (stepCount-- > 0) {
+						Up();
+					}
+				}
+				else {
+					while (stepCount-- > 0) {
+						Down();
+					}
+				};
+
+				off();
+
+				_zLocation = CommandBuffer[_commandBufferTail].ZLocation;
+
+				break;
+			}
+			case 28:
+				_zLocation = 0;
+				break;
+			}
+		}
+		break;
+
+		case MCode:
+		{
+			switch (CommandBuffer[_commandBufferTail].Command)
+			{
+			case 119: {
+				Serial.print("z-min: ");
+				Serial.println(digitalRead(MIN_LIMIT) == LOW ? "hit" : "not hit");
+				Serial.print("z-max: ");
+				Serial.println(digitalRead(MAX_LIMIT) == LOW ? "hit" : "not hit");
+				break;
+			}
+			}
+		
+		}
+		break;
+
+	}
 
 	Serial.println("ok");
 
 	_commandBufferTail++;
+
 
 	if (_commandBufferTail == COMMAND_BUFFER_LENGTH)
 	{
@@ -368,31 +409,7 @@ void loop() {
 		ProcessCommand();
 	}
 
-	while (digitalRead(MAX_LIMIT) == LOW)
-	{
-		phase4();
-		delayMicroseconds(DELAY_MICRO_SECONDS);
-		phase3();
-		delayMicroseconds(DELAY_MICRO_SECONDS);
-		phase2();
-		delayMicroseconds(DELAY_MICRO_SECONDS);
-		phase1();
-		delayMicroseconds(DELAY_MICRO_SECONDS);
-	}
 
-	while (digitalRead(MIN_LIMIT) == LOW)
-	{
-		phase1();
-		delayMicroseconds(DELAY_MICRO_SECONDS);
-		phase2();
-		delayMicroseconds(DELAY_MICRO_SECONDS);
-		phase3();
-		delayMicroseconds(DELAY_MICRO_SECONDS);
-		phase4();
-		delayMicroseconds(DELAY_MICRO_SECONDS);
-	}
-
-	off();
 
 
 	/*  // put your main code here, to run repeatedly:
