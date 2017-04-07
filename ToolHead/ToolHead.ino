@@ -4,12 +4,14 @@
 #define IN3 9
 #define IN4 7
 #define DELAY_MICRO_SECONDS 5000
-#define MAX_LIMIT 5
-#define MIN_LIMIT 4
+#define MAX_LIMIT 4
+#define MIN_LIMIT 5
 
 #define COMMAND_BUFFER_LENGTH 20
 #define GCODE_LINE_BUFFER_LENGTH 50
 #define WORD_BUFFER_LENGTH 10
+
+#include <Stepper.h>
 
 byte bufferIndex;
 /* A full GCode Commands see GetCommand for understanding on buffer overflow */
@@ -74,18 +76,20 @@ void initCommandBuffer()
 	{
 		CommandBuffer[idx].Command = -1;
 		CommandBuffer[idx].CommandType = Unknown;
-		CommandBuffer[idx].Feed = 500;
+		CommandBuffer[idx].Feed = 5000;
 		CommandBuffer[idx].ZLocation = 0;
 	}
 }
 
+Stepper motor(20, IN1, IN3, IN2, IN4);
+
 void setup() {
 	// put your setup code here, to run once:
-	pinMode(IN1, OUTPUT);
+	/*pinMode(IN1, OUTPUT);
 	pinMode(IN2, OUTPUT);
 	pinMode(IN3, OUTPUT);
 	pinMode(IN4, OUTPUT);
-
+	*/
 	pinMode(MIN_LIMIT, INPUT);
 	pinMode(MAX_LIMIT, INPUT);
 
@@ -96,6 +100,8 @@ void setup() {
 	wordBufferIndex = 0;
 	memset(buffer, 0, GCODE_LINE_BUFFER_LENGTH);
 	memset(wordBuffer, 0, WORD_BUFFER_LENGTH);
+
+
 }
 
 void phase1() {
@@ -305,26 +311,26 @@ void GetCommand()
 	}
 }
 
-void Up() {
+void Down(int feed) {
 	phase4();
-	delayMicroseconds(DELAY_MICRO_SECONDS);
+	delayMicroseconds(feed);
 	phase3();
-	delayMicroseconds(DELAY_MICRO_SECONDS);
+	delayMicroseconds(feed);
 	phase2();
-	delayMicroseconds(DELAY_MICRO_SECONDS);
+	delayMicroseconds(feed);
 	phase1();
-	delayMicroseconds(DELAY_MICRO_SECONDS);
+	delayMicroseconds(feed);
 }
 
-void Down() {
+void Up(int feed) {
 	phase1();
-	delayMicroseconds(DELAY_MICRO_SECONDS);
+	delayMicroseconds(feed);
 	phase2();
-	delayMicroseconds(DELAY_MICRO_SECONDS);
+	delayMicroseconds(feed);
 	phase3();
-	delayMicroseconds(DELAY_MICRO_SECONDS);
+	delayMicroseconds(feed);
 	phase4();
-	delayMicroseconds(DELAY_MICRO_SECONDS);
+	delayMicroseconds(feed);
 }
 
 
@@ -347,16 +353,20 @@ void ProcessCommand()
 				Serial.println(delta);
 				Serial.println(stepCount);
 
+				motor.setSpeed(100);
+				motor.step(160);
+
+				/*
 				if (delta > 0) {
 					while (stepCount-- > 0) {
-						Up();
+						Down(CommandBuffer[_commandBufferTail].Feed);
 					}
 				}
 				else {
-					while (stepCount-- > 0) {
-						Down();
+					while (stepCount-- > 0) {						
+						Up(CommandBuffer[_commandBufferTail].Feed);
 					}
-				};
+				};*/
 
 				off();
 
@@ -365,6 +375,10 @@ void ProcessCommand()
 				break;
 			}
 			case 28:
+				while (digitalRead(MIN_LIMIT) != LOW) {
+					Up(15000);					
+				}
+
 				_zLocation = 0;
 				break;
 			}
