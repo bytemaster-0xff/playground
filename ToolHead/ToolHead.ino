@@ -81,15 +81,15 @@ void initCommandBuffer()
 	}
 }
 
-Stepper motor(20, IN1, IN3, IN2, IN4);
+
 
 void setup() {
 	// put your setup code here, to run once:
-	/*pinMode(IN1, OUTPUT);
+	pinMode(IN1, OUTPUT);
 	pinMode(IN2, OUTPUT);
 	pinMode(IN3, OUTPUT);
 	pinMode(IN4, OUTPUT);
-	*/
+	
 	pinMode(MIN_LIMIT, INPUT);
 	pinMode(MAX_LIMIT, INPUT);
 
@@ -114,19 +114,51 @@ void phase1() {
 void phase2() {
 	digitalWrite(IN1, HIGH);
 	digitalWrite(IN2, LOW);
-	digitalWrite(IN3, LOW);
+	digitalWrite(IN3, HIGH);
 	digitalWrite(IN4, HIGH);
 }
 
 void phase3() {
+	digitalWrite(IN1, HIGH);
+	digitalWrite(IN2, LOW);
+	digitalWrite(IN3, LOW);
+	digitalWrite(IN4, HIGH);
+}
+
+
+void phase4() {
+	digitalWrite(IN1, HIGH);
+	digitalWrite(IN2, HIGH);
+	digitalWrite(IN3, LOW);
+	digitalWrite(IN4, HIGH);
+}
+
+
+void phase5() {
 	digitalWrite(IN1, LOW);
 	digitalWrite(IN2, HIGH);
 	digitalWrite(IN3, LOW);
 	digitalWrite(IN4, HIGH);
 }
 
-void phase4() {
+void phase6() {
 	digitalWrite(IN1, LOW);
+	digitalWrite(IN2, HIGH);
+	digitalWrite(IN3, HIGH);
+	digitalWrite(IN4, HIGH);
+}
+
+
+void phase7() {
+	digitalWrite(IN1, LOW);
+	digitalWrite(IN2, HIGH);
+	digitalWrite(IN3, HIGH);
+	digitalWrite(IN4, LOW);
+}
+
+
+void phase8() {
+	digitalWrite(IN1, HIGH);
 	digitalWrite(IN2, HIGH);
 	digitalWrite(IN3, HIGH);
 	digitalWrite(IN4, LOW);
@@ -179,6 +211,7 @@ void ParseWord()
 	memset(wordBuffer, 0, WORD_BUFFER_LENGTH);
 }
 
+Stepper motor(20, IN1, IN2, IN3, IN4);
 
 void GetCommand()
 {
@@ -312,6 +345,14 @@ void GetCommand()
 }
 
 void Down(int feed) {
+	phase8();
+	delayMicroseconds(feed);
+	phase7();
+	delayMicroseconds(feed);
+	phase6();
+	delayMicroseconds(feed);
+	phase5();
+	delayMicroseconds(feed);
 	phase4();
 	delayMicroseconds(feed);
 	phase3();
@@ -330,6 +371,14 @@ void Up(int feed) {
 	phase3();
 	delayMicroseconds(feed);
 	phase4();
+	delayMicroseconds(feed);
+	phase5();
+	delayMicroseconds(feed);
+	phase6();
+	delayMicroseconds(feed);
+	phase7();
+	delayMicroseconds(feed);
+	phase8();
 	delayMicroseconds(feed);
 }
 
@@ -353,10 +402,6 @@ void ProcessCommand()
 				Serial.println(delta);
 				Serial.println(stepCount);
 
-				motor.setSpeed(100);
-				motor.step(160);
-
-				/*
 				if (delta > 0) {
 					while (stepCount-- > 0) {
 						Down(CommandBuffer[_commandBufferTail].Feed);
@@ -366,7 +411,7 @@ void ProcessCommand()
 					while (stepCount-- > 0) {						
 						Up(CommandBuffer[_commandBufferTail].Feed);
 					}
-				};*/
+				};
 
 				off();
 
