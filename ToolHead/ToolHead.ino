@@ -1,11 +1,37 @@
 
-#define IN1 6
-#define IN2 8
-#define IN3 9
-#define IN4 7
+
 #define DELAY_MICRO_SECONDS 5000
-#define MAX_LIMIT 4
-#define MIN_LIMIT 5
+
+
+#define XMAX 2
+#define XMIN 3
+#define YMIN 14
+#define YMAX 15
+#define ZMIN 18
+#define ZMAX 19
+
+
+#define XENABLE 38
+#define YENABLE A2
+#define ZENABLE A8
+#define E1ENABLE 30
+#define E0ENABLE 24
+
+#define XSTEP A0
+#define XDIR A1
+#define YSTEP A6
+#define YDIR A7
+#define ZSTEP 46
+#define ZDIR 48
+#define E0STEP 26
+#define E0DIR 28
+#define E1STEP 36
+#define E1DIR 34
+
+#define UPPER_LIGHT 9
+#define LOWER_LIGHT 8
+#define SOLINOID 10
+
 
 #define COMMAND_BUFFER_LENGTH 20
 #define GCODE_LINE_BUFFER_LENGTH 50
@@ -84,14 +110,43 @@ void initCommandBuffer()
 
 
 void setup() {
+	Serial.begin(115200);
+	Serial.write("online");
+
 	// put your setup code here, to run once:
-	pinMode(IN1, OUTPUT);
-	pinMode(IN2, OUTPUT);
-	pinMode(IN3, OUTPUT);
-	pinMode(IN4, OUTPUT);
-	
-	pinMode(MIN_LIMIT, INPUT);
-	pinMode(MAX_LIMIT, INPUT);
+	pinMode(XENABLE, OUTPUT);
+	pinMode(YENABLE, OUTPUT);
+	pinMode(ZENABLE, OUTPUT);
+	pinMode(E1ENABLE, OUTPUT);
+	pinMode(E0ENABLE, OUTPUT);
+
+	pinMode(XSTEP, OUTPUT);
+	pinMode(XDIR, OUTPUT);
+
+	pinMode(YSTEP, OUTPUT);
+	pinMode(YDIR, OUTPUT);
+
+	pinMode(ZSTEP, OUTPUT);
+	pinMode(ZDIR, OUTPUT);
+
+	pinMode(E0STEP, OUTPUT);
+	pinMode(E0DIR, OUTPUT);
+
+	pinMode(E1STEP, OUTPUT);
+	pinMode(E1DIR, OUTPUT);
+
+	pinMode(UPPER_LIGHT, OUTPUT);
+	pinMode(LOWER_LIGHT, OUTPUT);
+	pinMode(SOLINOID, OUTPUT);
+
+
+	pinMode(XMAX, INPUT);
+	pinMode(XMIN, INPUT);
+	pinMode(YMAX, INPUT);
+	pinMode(YMIN, INPUT);
+	pinMode(ZMAX, INPUT);
+	pinMode(ZMIN, INPUT);
+
 
 	initCommandBuffer();
 
@@ -100,77 +155,7 @@ void setup() {
 	wordBufferIndex = 0;
 	memset(buffer, 0, GCODE_LINE_BUFFER_LENGTH);
 	memset(wordBuffer, 0, WORD_BUFFER_LENGTH);
-
-
 }
-
-void phase1() {
-	digitalWrite(IN1, HIGH);
-	digitalWrite(IN2, LOW);
-	digitalWrite(IN3, HIGH);
-	digitalWrite(IN4, LOW);
-}
-
-void phase2() {
-	digitalWrite(IN1, HIGH);
-	digitalWrite(IN2, LOW);
-	digitalWrite(IN3, HIGH);
-	digitalWrite(IN4, HIGH);
-}
-
-void phase3() {
-	digitalWrite(IN1, HIGH);
-	digitalWrite(IN2, LOW);
-	digitalWrite(IN3, LOW);
-	digitalWrite(IN4, HIGH);
-}
-
-
-void phase4() {
-	digitalWrite(IN1, HIGH);
-	digitalWrite(IN2, HIGH);
-	digitalWrite(IN3, LOW);
-	digitalWrite(IN4, HIGH);
-}
-
-
-void phase5() {
-	digitalWrite(IN1, LOW);
-	digitalWrite(IN2, HIGH);
-	digitalWrite(IN3, LOW);
-	digitalWrite(IN4, HIGH);
-}
-
-void phase6() {
-	digitalWrite(IN1, LOW);
-	digitalWrite(IN2, HIGH);
-	digitalWrite(IN3, HIGH);
-	digitalWrite(IN4, HIGH);
-}
-
-
-void phase7() {
-	digitalWrite(IN1, LOW);
-	digitalWrite(IN2, HIGH);
-	digitalWrite(IN3, HIGH);
-	digitalWrite(IN4, LOW);
-}
-
-
-void phase8() {
-	digitalWrite(IN1, HIGH);
-	digitalWrite(IN2, HIGH);
-	digitalWrite(IN3, HIGH);
-	digitalWrite(IN4, LOW);
-}
-
-void off() {
-	digitalWrite(IN1, LOW);
-	digitalWrite(IN2, LOW);
-	digitalWrite(IN3, LOW);
-	digitalWrite(IN4, LOW);
-}
-
 
 
 void ParseWord()
@@ -211,7 +196,6 @@ void ParseWord()
 	memset(wordBuffer, 0, WORD_BUFFER_LENGTH);
 }
 
-Stepper motor(20, IN1, IN2, IN3, IN4);
 
 void GetCommand()
 {
@@ -344,105 +328,79 @@ void GetCommand()
 	}
 }
 
-void Down(int feed) {
-	phase8();
-	delayMicroseconds(feed);
-	phase7();
-	delayMicroseconds(feed);
-	phase6();
-	delayMicroseconds(feed);
-	phase5();
-	delayMicroseconds(feed);
-	phase4();
-	delayMicroseconds(feed);
-	phase3();
-	delayMicroseconds(feed);
-	phase2();
-	delayMicroseconds(feed);
-	phase1();
-	delayMicroseconds(feed);
-}
-
-void Up(int feed) {
-	phase1();
-	delayMicroseconds(feed);
-	phase2();
-	delayMicroseconds(feed);
-	phase3();
-	delayMicroseconds(feed);
-	phase4();
-	delayMicroseconds(feed);
-	phase5();
-	delayMicroseconds(feed);
-	phase6();
-	delayMicroseconds(feed);
-	phase7();
-	delayMicroseconds(feed);
-	phase8();
-	delayMicroseconds(feed);
-}
-
-
 #define STEP_PER_CM 10
 
 void ProcessCommand()
 {
 	switch (CommandBuffer[_commandBufferTail].CommandType)
 	{
-		case GCode:
+	case GCode:
+	{
+		switch (CommandBuffer[_commandBufferTail].Command)
 		{
-			switch (CommandBuffer[_commandBufferTail].Command)
-			{
-			case 0:
-			case 1: {
-				float delta = CommandBuffer[_commandBufferTail].ZLocation - _zLocation;
+		case 0:
+		case 1: {
+			float delta = CommandBuffer[_commandBufferTail].ZLocation - _zLocation;
 
-				int stepCount = abs(delta * STEP_PER_CM);
-				Serial.println(CommandBuffer[_commandBufferTail].ZLocation);
-				Serial.println(delta);
-				Serial.println(stepCount);
+			int stepCount = abs(delta * STEP_PER_CM);
+			Serial.println(CommandBuffer[_commandBufferTail].ZLocation);
+			Serial.println(delta);
+			Serial.println(stepCount);
 
-				if (delta > 0) {
-					while (stepCount-- > 0) {
-						Down(CommandBuffer[_commandBufferTail].Feed);
-					}
+			if (delta > 0) {
+				while (stepCount-- > 0) {
+					//Down(CommandBuffer[_commandBufferTail].Feed);
 				}
-				else {
-					while (stepCount-- > 0) {						
-						Up(CommandBuffer[_commandBufferTail].Feed);
-					}
-				};
-
-				off();
-
-				_zLocation = CommandBuffer[_commandBufferTail].ZLocation;
-
-				break;
 			}
-			case 28:
-				while (digitalRead(MIN_LIMIT) != LOW) {
-					Up(15000);					
+			else {
+				while (stepCount-- > 0) {
+					//Up(CommandBuffer[_commandBufferTail].Feed);
 				}
+			};
 
-				_zLocation = 0;
-				break;
-			}
+
+			_zLocation = CommandBuffer[_commandBufferTail].ZLocation;
+
+			break;
 		}
-		break;
+		case 28:
+			//while (digitalRead(MIN_LIMIT) != LOW) {
+//					Up(15000);					
+	//			}
 
-		case MCode:
+			_zLocation = 0;
+			break;
+		}
+	}
+	break;
+
+	case MCode:
+	{
+		switch (CommandBuffer[_commandBufferTail].Command)
 		{
-			switch (CommandBuffer[_commandBufferTail].Command)
-			{
-			case 119: {
-				Serial.print("z-min: ");
-				Serial.println(digitalRead(MIN_LIMIT) == LOW ? "hit" : "not hit");
-				Serial.print("z-max: ");
-				Serial.println(digitalRead(MAX_LIMIT) == LOW ? "hit" : "not hit");
-				break;
-			}
-			}
-		
+
+		case 1: {
+			digitalWrite(UPPER_LIGHT, 0);
+			break;
+		}
+		case 2: {
+			digitalWrite(UPPER_LIGHT, 1);
+			break;
+		}
+		case 101: {
+
+		}
+		case 102: {
+
+		}
+		case 119: {
+			Serial.print("z-min: ");
+			Serial.println(digitalRead(ZMIN) == LOW ? "hit" : "not hit");
+			Serial.print("z-max: ");
+			Serial.println(digitalRead(ZMAX) == LOW ? "hit" : "not hit");
+			break;
+		}
+
 		}
 		break;
 
@@ -456,6 +414,7 @@ void ProcessCommand()
 	if (_commandBufferTail == COMMAND_BUFFER_LENGTH)
 	{
 		_commandBufferTail = 0;
+	}
 	}
 }
 
