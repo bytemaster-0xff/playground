@@ -69,7 +69,10 @@ enum WordTypes
 	ExpectingYLocation,
 	ExpectingZLocation,
 	ExpectingCLocation,
-	ExpectingPowerStatus,
+	ExpectingILocation,
+	ExpectingJLocation,
+	ExpectingSParameter,
+	ExpectingPParameter,
 	NotSpecified,
 };
 
@@ -96,43 +99,72 @@ typedef struct GCodeCommand
 	CommandTypes CommandType;
 	byte Command;
 	float XLocation;
-	bool HasXLocation;
+
+	bool HasXParameter;
 	float YLocation;
-	bool HasYLocation;
+	bool HasYParameter;
 	float ZLocation;
-	bool HasZLocation;
+	bool HasZParameter;
 	float CLocation;
-	bool HasCLocation;
+	bool HasCParameter;
+	float ELocatoin;
+	bool HasELocation;
+
+	short SParameter;
+	bool HasSParameter;
+
+	short PParameter;
+	bool HasPParameter;
+
+	float IParameter;
+	bool HasIParameter;
+
+	float JParameter;
+	bool HasJParameter;
+
 	float Feed;
-	bool PowerStatus;
-	bool HasPowerStatus;
 } GCodeCommand_t;
 
 
 GCodeCommand_t CommandBuffer[COMMAND_BUFFER_LENGTH];
 
-A4988 XAxis(XDIR, XSTEP, XENABLE);
-A4988 YAxis(YDIR, YSTEP, YENABLE);
-A4988 CAxis(ZDIR, ZSTEP, ZENABLE);
-A4988 ZPlace(ZDIR, ZSTEP, ZENABLE);
-A4988 ZSolder(ZDIR, ZSTEP, ZENABLE);
+A4988 XAxis(XDIR, XSTEP, XENABLE, "X");
+A4988 YAxis(YDIR, YSTEP, YENABLE, "Y");
+A4988 CAxis(ZDIR, ZSTEP, ZENABLE, "C");
+A4988 ZPlace(ZDIR, ZSTEP, ZENABLE, "PLACE");
+A4988 ZSolder(ZDIR, ZSTEP, ZENABLE, "SOLDER");
+
+
+void ResetWord(int idx) {
+	CommandBuffer[idx].Command = -1;
+	CommandBuffer[idx].CommandType = Unknown;
+	CommandBuffer[idx].Feed = 5000;
+	CommandBuffer[idx].XLocation = 0;
+	CommandBuffer[idx].HasXParameter = false;
+	CommandBuffer[idx].YLocation = 0;
+	CommandBuffer[idx].HasYParameter = false;
+	CommandBuffer[idx].ZLocation = 0;
+	CommandBuffer[idx].HasZParameter = false;
+	CommandBuffer[idx].CLocation = 0;
+	CommandBuffer[idx].HasCParameter = false;
+	CommandBuffer[idx].IParameter = 0;
+	CommandBuffer[idx].HasIParameter = false;
+	CommandBuffer[idx].JParameter = 0;
+	CommandBuffer[idx].HasJParameter = false;
+	CommandBuffer[idx].PParameter = 0;
+	CommandBuffer[idx].HasPParameter = false;
+	CommandBuffer[idx].SParameter = 0;
+	CommandBuffer[idx].HasSParameter = false;
+
+
+}
 
 
 void initCommandBuffer()
 {
 	for (byte idx = 0; idx < COMMAND_BUFFER_LENGTH; ++idx)
 	{
-		CommandBuffer[idx].Command = -1;
-		CommandBuffer[idx].CommandType = Unknown;
-		CommandBuffer[idx].Feed = 5000;
-		CommandBuffer[idx].XLocation = 0;
-		CommandBuffer[idx].HasXLocation = 0;
-		CommandBuffer[idx].YLocation = 0;
-		CommandBuffer[idx].HasYLocation = 0;
-		CommandBuffer[idx].ZLocation = 0;
-		CommandBuffer[idx].HasZLocation = 0;
-		CommandBuffer[idx].CLocation = 0;
-		CommandBuffer[idx].HasCLocation = 0;
+		ResetWord(idx);
 	}
 }
 
@@ -140,6 +172,14 @@ void initCommandBuffer()
 void setup() {
 	Serial.begin(115200);
 	Serial.write("online");
+
+	XAxis.SetMaxLimitPin(XMAX);
+	XAxis.SetMinLimitPin(XMIN);
+	YAxis.SetMaxLimitPin(XMAX);
+	YAxis.SetMinLimitPin(XMIN);
+
+	ZPlace.SetMinLimitPin(PNPHEADMAX);
+	ZSolder.SetMinLimitPin(SOLDERPASTEMAX);
 
 	// put your setup code here, to run once:
 	pinMode(UPPER_LIGHT, OUTPUT);
@@ -197,23 +237,31 @@ void ParseWord()
 		break;
 	case ExpectingXLocation:
 		CommandBuffer[_commandBufferHead].XLocation = atof(wordBuffer);
-		CommandBuffer[_commandBufferHead].HasXLocation = true;
 		break;
 	case ExpectingYLocation:
 		CommandBuffer[_commandBufferHead].YLocation = atof(wordBuffer);
-		CommandBuffer[_commandBufferHead].HasYLocation = true;
 		break;
 	case ExpectingZLocation:
 		CommandBuffer[_commandBufferHead].ZLocation = atof(wordBuffer);
-		CommandBuffer[_commandBufferHead].HasZLocation = true;
 		break;
 	case ExpectingCLocation:
 		CommandBuffer[_commandBufferHead].CLocation = atof(wordBuffer);
-		CommandBuffer[_commandBufferHead].HasCLocation = true;
 		break;
-	case ExpectingPowerStatus:
-		CommandBuffer[_commandBufferHead].PowerStatus = atoi(wordBuffer) != 0;
-		CommandBuffer[_commandBufferHead].HasPowerStatus = true;
+	case ExpectingPParameter:
+		CommandBuffer[_commandBufferHead].PParameter = atoi(wordBuffer);
+		CommandBuffer[_commandBufferHead].HasPParameter = true;
+		break;
+	case ExpectingSParameter:
+		CommandBuffer[_commandBufferHead].SParameter = atoi(wordBuffer);
+		CommandBuffer[_commandBufferHead].HasSParameter = true;
+		break;
+	case ExpectingILocation:
+		CommandBuffer[_commandBufferHead].IParameter = atoi(wordBuffer);
+		CommandBuffer[_commandBufferHead].HasIParameter = true;
+		break;
+	case ExpectingJLocation:
+		CommandBuffer[_commandBufferHead].JParameter = atoi(wordBuffer);
+		CommandBuffer[_commandBufferHead].HasSParameter = true;
 		break;
 	}
 
@@ -221,6 +269,16 @@ void ParseWord()
 	_wordType = NotSpecified;
 	wordBufferIndex = 0;
 	memset(wordBuffer, 0, WORD_BUFFER_LENGTH);
+}
+
+
+bool IsCurrentCommandMovement() {
+	return(CommandBuffer[_commandBufferHead].CommandType == GCode &&
+		(CommandBuffer[_commandBufferHead].Command == 0 ||
+			CommandBuffer[_commandBufferHead].Command == 1 ||
+			CommandBuffer[_commandBufferHead].Command == 2 ||
+			CommandBuffer[_commandBufferHead].Command == 3));
+
 }
 
 
@@ -298,30 +356,57 @@ void GetCommand()
 		case '-': case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': case '.':
 			wordBuffer[wordBufferIndex++] = buffer[parserIndex];
 			break;
-		case 'X':
-			ParseWord();
-			_wordType = ExpectingXLocation;
-			_parserState = PendingNextWord;
-			break;
 		case 'P':
 			ParseWord();
-			_wordType = ExpectingPowerStatus;
+			_wordType = ExpectingPParameter;
 			_parserState = PendingNextWord;
+			break;
+		case 'S':
+			ParseWord();
+			_wordType = ExpectingSParameter;
+			_parserState = PendingNextWord;
+			break;
+		case 'I':
+			ParseWord();
+			_wordType = ExpectingILocation;
+			_parserState = PendingNextWord;
+			break;
+		case 'J':
+			ParseWord();
+			_wordType = ExpectingJLocation;
+			_parserState = PendingNextWord;
+			break;
+		case 'X':
+			ParseWord();
+			CommandBuffer[_commandBufferHead].HasXParameter = true;
+			if (IsCurrentCommandMovement()) {
+				_wordType = ExpectingXLocation;
+				_parserState = PendingNextWord;
+			}
 			break;
 		case 'Y':
 			ParseWord();
-			_wordType = ExpectingYLocation;
-			_parserState = PendingNextWord;
+			CommandBuffer[_commandBufferHead].HasYParameter = true;
+			if (IsCurrentCommandMovement()) {
+				_wordType = ExpectingYLocation;
+				_parserState = PendingNextWord;
+			}
 			break;
 		case 'C':
 			ParseWord();
-			_wordType = ExpectingCLocation;
-			_parserState = PendingNextWord;
+			CommandBuffer[_commandBufferHead].HasCParameter = true;
+			if (IsCurrentCommandMovement()) {
+				_wordType = ExpectingCLocation;
+				_parserState = PendingNextWord;
+			}
 			break;
 		case 'Z':
 			ParseWord();
-			_wordType = ExpectingZLocation;
-			_parserState = PendingNextWord;
+			CommandBuffer[_commandBufferHead].HasZParameter = true;
+			if (IsCurrentCommandMovement()) {
+				_wordType = ExpectingZLocation;
+				_parserState = PendingNextWord;
+			}
 			break;
 		case 'F':
 			ParseWord();
@@ -374,18 +459,10 @@ void GetCommand()
 				Serial.println("<error:003>");
 			}
 
+
 			/* Set Defaults for Next Command Buffer */
-			CommandBuffer[_commandBufferHead].Command = -1;
-			CommandBuffer[_commandBufferHead].CommandType = Unknown;
+			ResetWord(_commandBufferHead);
 			CommandBuffer[_commandBufferHead].Feed = CommandBuffer[_commandBufferHead == 0 ? COMMAND_BUFFER_LENGTH - 1 : _commandBufferHead - 1].Feed;
-			CommandBuffer[_commandBufferHead].HasXLocation = false;
-			CommandBuffer[_commandBufferHead].XLocation = 0.0f;
-			CommandBuffer[_commandBufferHead].HasYLocation = false;
-			CommandBuffer[_commandBufferHead].YLocation = 0.0f;
-			CommandBuffer[_commandBufferHead].HasZLocation = false;
-			CommandBuffer[_commandBufferHead].ZLocation = 0.0f;
-			CommandBuffer[_commandBufferHead].HasCLocation = false;
-			CommandBuffer[_commandBufferHead].CLocation = 0.0f;
 
 			parserIndex = 0;
 			bufferIndex = 0;
@@ -395,87 +472,172 @@ void GetCommand()
 	}
 }
 
-#define STEP_PER_CM 10
+void EnableMotors() {
+	GCodeCommand current = CommandBuffer[_commandBufferTail];
+
+	if (current.HasXParameter || current.HasYParameter || current.HasZParameter || current.HasCParameter)
+	{
+		if (current.HasXParameter) XAxis.Enable();
+		if (current.HasYParameter) YAxis.Enable();
+		if (current.HasCParameter) CAxis.Enable();
+		if (current.HasZParameter) {
+			switch (_currentTool) {
+			case 0: ZPlace.Enable(); break;
+			case 2: ZSolder.Enable(); break;
+			}
+
+		}
+	}
+	else {
+		XAxis.Enable();
+		YAxis.Enable();
+		CAxis.Enable();
+		ZPlace.Enable();
+		ZSolder.Enable();
+	}
+}
+
+void DisableMotors() {
+	GCodeCommand current = CommandBuffer[_commandBufferTail];
+
+	if (current.HasXParameter || current.HasYParameter || current.HasZParameter || current.HasCParameter)
+	{
+		if (current.HasXParameter) XAxis.Disable();
+		if (current.HasYParameter) YAxis.Disable();
+		if (current.HasCParameter) CAxis.Disable();
+		if (current.HasZParameter) {
+			switch (_currentTool) {
+			case 0: ZPlace.Enable(); break;
+			case 2: ZSolder.Enable(); break;
+			}
+		}
+	}
+	else {
+		XAxis.Disable();
+		YAxis.Disable();
+		CAxis.Disable();
+		ZPlace.Disable();
+		ZSolder.Disable();
+	}
+}
+
+void Home() {
+	GCodeCommand current = CommandBuffer[_commandBufferTail];
+
+	if (current.HasXParameter || current.HasYParameter || current.HasZParameter)
+	{
+		if (current.HasXParameter) {
+			XAxis.Home();
+		}
+		if (current.HasYParameter) {
+			YAxis.Home();
+		}
+		if (current.HasZParameter) {
+			if (_currentTool == 0) {
+				ZPlace.Move(current.ZLocation, current.Feed);
+			}
+			else {
+				ZSolder.Move(current.ZLocation, current.Feed);
+			}
+		}
+	}
+	else
+	{
+		XAxis.Home();
+		YAxis.Home();
+		ZPlace.Home();
+		ZSolder.Home();
+	}
+}
+
+void LinearMove() {
+	GCodeCommand current = CommandBuffer[_commandBufferTail];
+
+	if (current.HasXParameter) {
+		XAxis.Move(current.XLocation, current.Feed);
+	}
+
+	if (current.HasYParameter) {
+		YAxis.Move(current.YLocation, current.Feed);
+	}
+
+	if (current.HasZParameter) {
+		if (_currentTool == 0) {
+			ZPlace.Move(current.ZLocation, current.Feed);
+		}
+		else {
+			ZSolder.Move(current.ZLocation, current.Feed);
+		}
+	}
+
+	if (current.HasCParameter) {
+		CAxis.Move(current.CLocation, current.Feed);
+	}
+}
+
+void ArcMove() {
+	GCodeCommand current = CommandBuffer[_commandBufferTail];
+}
+
+void Dwell() {
+	GCodeCommand current = CommandBuffer[_commandBufferTail];
+}
+
+void CheckEndStops() {
+	Serial.print("x-min: ");
+	Serial.println(digitalRead(XMIN) == LOW ? "hit" : "not hit");
+	Serial.print("x-max: ");
+	Serial.println(digitalRead(XMAX) == LOW ? "hit" : "not hit");
+	Serial.print("y-min: ");
+	Serial.println(digitalRead(YMIN) == LOW ? "hit" : "not hit");
+	Serial.print("y-max: ");
+	Serial.println(digitalRead(YMAX) == LOW ? "hit" : "not hit");
+	Serial.print("placez-min: ");
+	Serial.println(digitalRead(SOLDERPASTEMAX) == LOW ? "hit" : "not hit");
+	Serial.print("solderz-min: ");
+	Serial.println(digitalRead(PNPHEADMAX) == LOW ? "hit" : "not hit");
+}
 
 void ProcessCommand()
 {
-	switch (CommandBuffer[_commandBufferTail].CommandType)
+	GCodeCommand current = CommandBuffer[_commandBufferTail];
+	switch (current.CommandType)
 	{
-		case GCode:
+	case GCode:
+		switch (current.Command)
 		{
-			switch (CommandBuffer[_commandBufferTail].Command)
-			{
-			case 0:
-			case 1: {				
-				if (CommandBuffer[_commandBufferTail].HasXLocation) {
-					XAxis.Move(CommandBuffer[_commandBufferTail].XLocation, CommandBuffer[_commandBufferTail].Feed);
-				}
-
-				if (CommandBuffer[_commandBufferTail].HasYLocation) {
-					YAxis.Move(CommandBuffer[_commandBufferTail].YLocation, CommandBuffer[_commandBufferTail].Feed);
-				}
-
-				if (CommandBuffer[_commandBufferTail].HasZLocation) {
-					if (_currentTool == 0) {
-						ZPlace.Move(CommandBuffer[_commandBufferTail].ZLocation, CommandBuffer[_commandBufferTail].Feed);
-					}
-					else {
-						ZSolder.Move(CommandBuffer[_commandBufferTail].ZLocation, CommandBuffer[_commandBufferTail].Feed);
-					}
-				}
-
-				if (CommandBuffer[_commandBufferTail].HasCLocation) {
-					CAxis.Move(CommandBuffer[_commandBufferTail].CLocation, CommandBuffer[_commandBufferTail].Feed);
-				}
-
-				break;
-			}
-			case 28:
-				//while (digitalRead(MIN_LIMIT) != LOW) {
-	//					Up(15000);					
-		//			}
-
-				
-				break;
-			}
+		case 0:
+		case 1: LinearMove();
+			break;
+		case 2:
+		case 3: ArcMove();
+			break;
+		case 4: Dwell();
+			break;
+		case 28: Home(); break;
 		}
 		break;
-		case TCode:
-			switch (CommandBuffer[_commandBufferTail].Command)
-			{
-			case 0: Serial.println("Setting Tool 0"); break;
-			case 1: Serial.println("Setting Tool 1"); break;
-			}
-			break;
 
-		case MCode:
+	case TCode:
+		switch (CommandBuffer[_commandBufferTail].Command)
 		{
-			switch (CommandBuffer[_commandBufferTail].Command)
-			{
-			case 60: { digitalWrite(UPPER_LIGHT, CommandBuffer[_commandBufferTail].PowerStatus ? 1 : 0); } break;
-			case 61: { digitalWrite(LOWER_LIGHT, CommandBuffer[_commandBufferTail].PowerStatus ? 1 : 0); } break;
-			case 62: { digitalWrite(SOLENOID, CommandBuffer[_commandBufferTail].PowerStatus ? 1 : 0); }break;
-			case 119: {
-				Serial.print("x-min: ");
-				Serial.println(digitalRead(XMIN) == LOW ? "hit" : "not hit");
-				Serial.print("x-max: ");
-				Serial.println(digitalRead(XMAX) == LOW ? "hit" : "not hit");
-				Serial.print("y-min: ");
-				Serial.println(digitalRead(YMIN) == LOW ? "hit" : "not hit");
-				Serial.print("y-max: ");
-				Serial.println(digitalRead(YMAX) == LOW ? "hit" : "not hit");
-				Serial.print("placez-min: ");
-				Serial.println(digitalRead(SOLDERPASTEMAX) == LOW ? "hit" : "not hit");
-				Serial.print("solderz-min: ");
-				Serial.println(digitalRead(PNPHEADMAX) == LOW ? "hit" : "not hit");
-
-				break;
-			}
-
-			}
-			break;
-
+		case 0: Serial.println("Setting Tool 0"); break;
+		case 1: Serial.println("Setting Tool 1"); break;
 		}
+		break;
+
+	case MCode:
+		switch (CommandBuffer[_commandBufferTail].Command)
+		{
+		case 17: EnableMotors(); break;
+		case 18: DisableMotors(); break;
+		case 60: { digitalWrite(UPPER_LIGHT, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
+		case 61: { digitalWrite(LOWER_LIGHT, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
+		case 62: { digitalWrite(SOLENOID, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
+		case 119: CheckEndStops(); break;
+		}
+		break;
+
 	}
 
 	Serial.println("ok");
