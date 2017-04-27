@@ -33,7 +33,6 @@ void A4988::EnalableIRQ(int uSec) {
 		// enable timer compare interrupt
 		TIMSK1 |= (1 << OCIE1A);
 		m_isBusy = true;
-		Serial.println("START Timer1");
 	}
 	else if (m_timer == 2) {
 		TCCR2A = 0;// set entire TCCR2A register to 0
@@ -48,7 +47,6 @@ void A4988::EnalableIRQ(int uSec) {
 		// enable timer compare interrupt
 		TIMSK2 |= (1 << OCIE2A);
 		m_isBusy = true;
-		Serial.println("START Timer2");
 	}
 }
 
@@ -117,17 +115,21 @@ void A4988::Move(float cm, float feed) {
 
 	Serial.print(m_axisName);
 	Serial.print(" ");
+	Serial.print(m_timer);
+	Serial.print(" ");
 	Serial.print(cm);
 	Serial.print(" ");
 	Serial.println(m_stepsRemaining);
 
 	if (m_timer == -1) {
+		Serial.println("START");
+
 		while (m_stepsRemaining > 0) {
 			digitalWrite(m_stepPin, HIGH);
 			delayMicroseconds(150);
 			digitalWrite(m_stepPin, LOW);
 			delayMicroseconds(150);
-
+			m_stepsRemaining--;
 			if (!m_ForwardDirection && m_minLimitPin != -1 && digitalRead(m_minLimitPin) == LOW)
 			{
 				m_stepsRemaining = 0;
@@ -147,25 +149,25 @@ void A4988::Move(float cm, float feed) {
 			}
 		}
 
+		Serial.println("END");
+
 		m_currentLocation = cm;
 	}
 	else {
 		m_destinationCM = cm;
 		EnalableIRQ(150);
 	}
-
-
 }
 
-void A4988::Home()
-{
+void A4988::Home(){
 	bool endStopHit = false;
+	Enable();
+
 	digitalWrite(m_dirPin, LOW);
 	m_bHoming = true;
 
 	while (endStopHit == false)
 	{
-
 		digitalWrite(m_stepPin, HIGH);
 		delayMicroseconds(250);
 
@@ -195,7 +197,10 @@ void A4988::Update() {
 	}
 	else if (m_lastToggleType == HIGH) {
 		digitalWrite(m_stepPin, LOW);
-		m_stepsRemaining--;
+		if (!m_bHoming) {
+			m_stepsRemaining--;
+		}
+
 		m_lastToggleType = LOW;
 		if (m_stepsRemaining == 0) {
 			DisableIRQ();
@@ -203,18 +208,29 @@ void A4988::Update() {
 	}
 	if (!m_ForwardDirection && m_minLimitPin != -1 && digitalRead(m_minLimitPin) == LOW)
 	{
-		Serial.println(m_axisName);
-		Serial.println(" ");
-		Serial.println("MIN-LIMIT-HIT");
-		m_minSwitchTripped = true;
+		if (!m_bHoming) {
+			Serial.println("<EndStop:");
+			Serial.println(",min,");
+			Serial.println(m_axisName);
+			Serial.println(">");
+			m_minSwitchTripped = true;
+		}
+		else {
+			m_bHoming = false;
+			m_currentLocation = 0;
+		}
+
+		DisableIRQ();
 	}
 
 	if (m_ForwardDirection && m_maxLimitPin != -1 && digitalRead(m_maxLimitPin) == LOW)
 	{
+		Serial.println("<EndStop:");
+		Serial.println(",max,");
 		Serial.println(m_axisName);
-		Serial.println(" ");
-		Serial.println("MAX-LIMIT-HIT");
-		m_maxSwitchTripped = true;
+		Serial.println(">");
+
+		DisableIRQ();
 	}
 }
 

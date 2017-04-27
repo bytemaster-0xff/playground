@@ -18,12 +18,12 @@ private:
 
 	bool m_bHoming = false;
 
-	uint8_t m_timer = -1;
+	int8_t m_timer = -1;
 	uint8_t m_dirPin;
 	uint8_t m_stepPin;
 	uint8_t m_enablePin;	
-	uint8_t m_maxLimitPin = -1;
-	uint8_t m_minLimitPin = -1;
+	int8_t m_maxLimitPin = -1;
+	int8_t m_minLimitPin = -1;
 	String m_axisName;
 	bool m_isBusy = false;
 	bool m_minSwitchTripped = false;

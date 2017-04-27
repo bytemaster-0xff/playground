@@ -8,9 +8,8 @@
 #define XMIN 3
 #define YMIN 14
 #define YMAX 15
-#define SOLDERPASTEMAX 19
-#define PNPHEADMAX 18
-
+#define SOLDERPASTEMAX 18
+#define PNPHEADMAX 19
 
 #define XENABLE 38
 #define YENABLE A2
@@ -22,8 +21,11 @@
 #define XDIR A1
 #define YSTEP A6
 #define YDIR A7
+
 #define ZSTEP 46
 #define ZDIR 48
+
+
 #define E0STEP 26
 #define E0DIR 28
 #define E1STEP 36
@@ -49,7 +51,6 @@ byte wordBufferIndex;
 char wordBuffer[WORD_BUFFER_LENGTH];
 
 byte parserIndex;
-
 
 enum ParserState
 {
@@ -83,7 +84,6 @@ enum CommandTypes
 	MCode,
 	Unknown
 };
-
 
 int _currentTool = 0;
 int _hasPart = 0;
@@ -132,8 +132,8 @@ GCodeCommand_t CommandBuffer[COMMAND_BUFFER_LENGTH];
 A4988 XAxis(XDIR, XSTEP, XENABLE, "X");
 A4988 YAxis(YDIR, YSTEP, YENABLE, "Y");
 A4988 CAxis(ZDIR, ZSTEP, ZENABLE, "C");
-A4988 ZPlace(ZDIR, ZSTEP, ZENABLE, "PLACE");
-A4988 ZSolder(ZDIR, ZSTEP, ZENABLE, "SOLDER");
+A4988 ZPlace(E0DIR, E0STEP, E0ENABLE, "PLACE");
+A4988 ZSolder(E1DIR, E1STEP, E1ENABLE, "SOLDER");
 
 
 void ResetWord(int idx) {
@@ -156,8 +156,6 @@ void ResetWord(int idx) {
 	CommandBuffer[idx].HasPParameter = false;
 	CommandBuffer[idx].SParameter = 0;
 	CommandBuffer[idx].HasSParameter = false;
-
-
 }
 
 
@@ -177,8 +175,8 @@ void setup() {
 	XAxis.SetMaxLimitPin(XMAX);
 	XAxis.SetMinLimitPin(XMIN);
 	XAxis.SetISRTimer(1);
-	YAxis.SetMaxLimitPin(XMAX);
-	YAxis.SetMinLimitPin(XMIN);
+	YAxis.SetMaxLimitPin(YMAX);
+	YAxis.SetMinLimitPin(YMIN);
 	YAxis.SetISRTimer(2);
 
 	ZPlace.SetMinLimitPin(PNPHEADMAX);
@@ -207,11 +205,11 @@ void setup() {
 }
 
 ISR(TIMER1_COMPA_vect) {
-	XAxis.Update();						
+	XAxis.Update();
 }
 
 ISR(TIMER2_COMPA_vect) {
-	YAxis.Update();						
+	YAxis.Update();
 }
 
 void ParseWord()
@@ -305,7 +303,7 @@ void GetCommand()
 
 	if (ch == '?')
 	{
-		Serial.print("<Idle,");		
+		Serial.print("<Idle,");
 		Serial.print("MPos:");
 		Serial.print(XAxis.GetCurrentLocation(), 4);
 		Serial.print(",");
@@ -407,32 +405,36 @@ void GetCommand()
 			CommandBuffer[_commandBufferHead].HasXParameter = true;
 			if (IsCurrentCommandMovement()) {
 				_wordType = ExpectingXLocation;
-				_parserState = PendingNextWord;
 			}
+
+			_parserState = PendingNextWord;
 			break;
 		case 'Y':
 			ParseWord();
 			CommandBuffer[_commandBufferHead].HasYParameter = true;
 			if (IsCurrentCommandMovement()) {
 				_wordType = ExpectingYLocation;
-				_parserState = PendingNextWord;
 			}
+
+			_parserState = PendingNextWord;
 			break;
 		case 'C':
 			ParseWord();
 			CommandBuffer[_commandBufferHead].HasCParameter = true;
 			if (IsCurrentCommandMovement()) {
-				_wordType = ExpectingCLocation;
-				_parserState = PendingNextWord;
+				_wordType = ExpectingCLocation;				
 			}
+
+			_parserState = PendingNextWord;
 			break;
 		case 'Z':
 			ParseWord();
 			CommandBuffer[_commandBufferHead].HasZParameter = true;
 			if (IsCurrentCommandMovement()) {
-				_wordType = ExpectingZLocation;
-				_parserState = PendingNextWord;
+				_wordType = ExpectingZLocation;				
 			}
+
+			_parserState = PendingNextWord;
 			break;
 		case 'F':
 			ParseWord();
@@ -509,7 +511,7 @@ void EnableMotors() {
 		if (current.HasZParameter) {
 			switch (_currentTool) {
 			case 0: ZPlace.Enable(); break;
-			case 2: ZSolder.Enable(); break;
+			case 1: ZSolder.Enable(); break;
 			}
 
 		}
@@ -534,7 +536,7 @@ void DisableMotors() {
 		if (current.HasZParameter) {
 			switch (_currentTool) {
 			case 0: ZPlace.Enable(); break;
-			case 2: ZSolder.Enable(); break;
+			case 1: ZSolder.Enable(); break;
 			}
 		}
 	}
@@ -560,10 +562,10 @@ void Home() {
 		}
 		if (current.HasZParameter) {
 			if (_currentTool == 0) {
-				ZPlace.Move(current.ZLocation, current.Feed);
+				ZPlace.Home();
 			}
 			else {
-				ZSolder.Move(current.ZLocation, current.Feed);
+				ZSolder.Home();
 			}
 		}
 	}
@@ -647,8 +649,8 @@ void ProcessCommand()
 	case TCode:
 		switch (CommandBuffer[_commandBufferTail].Command)
 		{
-		case 0: Serial.println("Setting Tool 0"); break;
-		case 1: Serial.println("Setting Tool 1"); break;
+		case 0: _currentTool = 0; break;
+		case 1: _currentTool = 1; break;
 		}
 		break;
 
