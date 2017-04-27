@@ -13,7 +13,9 @@ class A4988 {
 private:
 	long m_stepsRemaining;
 	uint8_t m_lastToggleType;
+	bool m_ForwardDirection;
 
+	uint8_t m_timer = -1;
 	uint8_t m_dirPin;
 	uint8_t m_stepPin;
 	uint8_t m_enablePin;	
@@ -24,8 +26,8 @@ private:
 	bool m_minSwitchTripped = false;
 	bool m_maxSwitchTripped = false;
 	float m_currentLocation;
-	void Update();
-
+	void EnalableIRQ(int uSec);
+	void DisableIRQ();
 
 public:
 	A4988(int dirPin, int stepPin, int enablePin, String axiSName);
@@ -36,9 +38,11 @@ public:
 	void SetMaxLimitPin(uint8_t maxLimit);
 	void Enable();
 	void Disable();
+	void SetISRTimer(uint8_t timer);
 	void Home();
 	void ClearLimitSwitches();
 	bool GetIsBusy();
+	void Update();
 };
 
 #endif

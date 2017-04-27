@@ -18,6 +18,50 @@ A4988::A4988(int dirPin, int stepPin, int enablePin, String axisName) {
 	Disable();
 }
 
+// FROM: http://www.instructables.com/id/Arduino-Timer-Interrupts/
+void A4988::EnalableIRQ(int uSec) {
+	if (m_timer == 1) {
+		TCCR1A = 0;// set entire TCCR1A register to 0
+		TCCR1B = 0;// same for TCCR1B
+		TCNT1 = 0;//initialize counter value to 0
+				  // set compare match register for 1hz increments
+		OCR1A = 15624;// = (16*10^6) / (1*1024) - 1 (must be <65536)
+					  // turn on CTC mode
+		TCCR1B |= (1 << WGM12);
+		// Set CS12 and CS10 bits for 1024 prescaler
+		TCCR1B |= (1 << CS12) | (1 << CS10);
+		// enable timer compare interrupt
+		TIMSK1 |= (1 << OCIE1A);
+		m_isBusy = true;
+	}
+	else if (m_timer == 2) {
+		TCCR2A = 0;// set entire TCCR2A register to 0
+		TCCR2B = 0;// same for TCCR2B
+		TCNT2 = 0;//initialize counter value to 0
+				  // set compare match register for 8khz increments
+		OCR2A = 249;// = (16*10^6) / (8000*8) - 1 (must be <256)
+					// turn on CTC mode
+		TCCR2A |= (1 << WGM21);
+		// Set CS21 bit for 8 prescaler
+		TCCR2B |= (1 << CS21);
+		// enable timer compare interrupt
+		TIMSK2 |= (1 << OCIE2A);
+		m_isBusy = true; 
+	}
+}
+
+void A4988::DisableIRQ() {
+	if (m_timer == 1) {
+		TIMSK1 &= ~(1 << OCIE1A);
+		m_isBusy = false;
+	}
+	else if (m_timer == 2) {
+		TIMSK2 &= ~(1 << OCIE2A);
+		m_isBusy = false;
+	}
+	
+}
+
 void A4988::SetMinLimitPin(uint8_t minlimitPin)
 {
 	m_minLimitPin = minlimitPin;
@@ -28,6 +72,9 @@ void A4988::SetMaxLimitPin(uint8_t maxLimitPin)
 	m_maxLimitPin = maxLimitPin;
 }
 
+void A4988::SetISRTimer(uint8_t timer) {
+	m_timer = timer;
+}
 
 void A4988::Enable() {
 	digitalWrite(m_enablePin, LOW);
@@ -47,34 +94,40 @@ void A4988::Move(float cm, float feed) {
 
 	float delta = cm - m_currentLocation;
 
+	m_ForwardDirection = delta > 0;
 
-	digitalWrite(m_dirPin, delta< 0 ? LOW : HIGH);
+	digitalWrite(m_dirPin, m_ForwardDirection ? HIGH : LOW);
 
-	long steps = abs(delta * 300);
+	m_stepsRemaining = abs(delta * 300);
 
-	for (int idx = 0; idx < steps; ++idx) {
-		digitalWrite(m_stepPin, HIGH);
-		delayMicroseconds(150);
-		digitalWrite(m_stepPin, LOW);
-		delayMicroseconds(150);
+	if (m_timer == -1) {
+		while (m_stepsRemaining > 0) {
+			digitalWrite(m_stepPin, HIGH);
+			delayMicroseconds(150);
+			digitalWrite(m_stepPin, LOW);
+			delayMicroseconds(150);
 
-		if (delta < 0 && m_minLimitPin != -1 && digitalRead(m_minLimitPin) == LOW)
-		{
-			idx = steps;
-			Serial.println(m_axisName);
-			Serial.println(" ");
-			Serial.println("MIN-LIMIT-HIT");
-			m_minLimitPin = true;
+			if (!m_ForwardDirection && m_minLimitPin != -1 && digitalRead(m_minLimitPin) == LOW)
+			{
+				m_stepsRemaining = 0;
+				Serial.println(m_axisName);
+				Serial.println(" ");
+				Serial.println("MIN-LIMIT-HIT");
+				m_minSwitchTripped = true;
+			}
+
+			if (m_ForwardDirection && m_maxLimitPin != -1 && digitalRead(m_maxLimitPin) == LOW)
+			{
+				m_stepsRemaining = 0;
+				Serial.println(m_axisName);
+				Serial.println(" ");
+				Serial.println("MAX-LIMIT-HIT");
+				m_maxSwitchTripped = true;
+			}
 		}
-
-		if (delta > 0 && m_maxLimitPin != -1 && digitalRead(m_maxLimitPin) == LOW)
-		{
-			idx = steps;
-			Serial.println(m_axisName);
-			Serial.println(" ");
-			Serial.println("MAX-LIMIT-HIT");
-			m_maxLimitPin = true;
-		}
+	}
+	else {
+		EnalableIRQ(150);
 	}
 
 	m_currentLocation = cm;
@@ -99,10 +152,39 @@ void A4988::Home()
 	m_currentLocation = 0;
 }
 
+void A4988::ClearLimitSwitches() {
+	m_minSwitchTripped = false;
+	m_maxSwitchTripped = false;
+}
 
 void A4988::Update()
 {
+	if (m_lastToggleType == LOW) {
+		digitalWrite(m_stepPin, HIGH);
+	}
+	else if (m_lastToggleType == HIGH) {
+		digitalWrite(m_stepPin, LOW);
+		m_stepsRemaining--;
+		if (m_stepsRemaining == 0) {
+			DisableIRQ();
+		}
+	}
 
+	if (!m_ForwardDirection && m_minLimitPin != -1 && digitalRead(m_minLimitPin) == LOW)
+	{
+		Serial.println(m_axisName);
+		Serial.println(" ");
+		Serial.println("MIN-LIMIT-HIT");
+		m_minSwitchTripped = true;
+	}
+
+	if (m_ForwardDirection && m_maxLimitPin != -1 && digitalRead(m_maxLimitPin) == LOW)
+	{
+		Serial.println(m_axisName);
+		Serial.println(" ");
+		Serial.println("MAX-LIMIT-HIT");
+		m_maxSwitchTripped = true;
+	}
 }
 
 float A4988::GetCurrentLocation() {

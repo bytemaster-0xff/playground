@@ -203,6 +203,13 @@ void setup() {
 	memset(wordBuffer, 0, WORD_BUFFER_LENGTH);
 }
 
+ISR(TIMER1_COMPA_vect) {
+	XAxis.Update();						
+}
+
+ISR(TIMER2_COMPA_vect) {
+	YAxis.Update();						
+}
 
 void ParseWord()
 {
