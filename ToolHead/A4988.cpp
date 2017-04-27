@@ -25,14 +25,15 @@ void A4988::EnalableIRQ(int uSec) {
 		TCCR1B = 0;// same for TCCR1B
 		TCNT1 = 0;//initialize counter value to 0
 				  // set compare match register for 1hz increments
-		OCR1A = 15624;// = (16*10^6) / (1*1024) - 1 (must be <65536)
-					  // turn on CTC mode
+		OCR1A = 249;// = (16*10^6) / (8000*4) - 1 (must be <256) /* 124 = 16
+					// turn on CTC mode
 		TCCR1B |= (1 << WGM12);
 		// Set CS12 and CS10 bits for 1024 prescaler
-		TCCR1B |= (1 << CS12) | (1 << CS10);
+		TCCR1B |= (1 << CS21);
 		// enable timer compare interrupt
 		TIMSK1 |= (1 << OCIE1A);
 		m_isBusy = true;
+		Serial.println("START Timer1");
 	}
 	else if (m_timer == 2) {
 		TCCR2A = 0;// set entire TCCR2A register to 0
@@ -46,7 +47,8 @@ void A4988::EnalableIRQ(int uSec) {
 		TCCR2B |= (1 << CS21);
 		// enable timer compare interrupt
 		TIMSK2 |= (1 << OCIE2A);
-		m_isBusy = true; 
+		m_isBusy = true;
+		Serial.println("START Timer2");
 	}
 }
 
@@ -54,12 +56,14 @@ void A4988::DisableIRQ() {
 	if (m_timer == 1) {
 		TIMSK1 &= ~(1 << OCIE1A);
 		m_isBusy = false;
+		m_currentLocation = m_destinationCM;
 	}
 	else if (m_timer == 2) {
 		TIMSK2 &= ~(1 << OCIE2A);
 		m_isBusy = false;
+		m_currentLocation = m_destinationCM;
 	}
-	
+
 }
 
 void A4988::SetMinLimitPin(uint8_t minlimitPin)
@@ -74,6 +78,11 @@ void A4988::SetMaxLimitPin(uint8_t maxLimitPin)
 
 void A4988::SetISRTimer(uint8_t timer) {
 	m_timer = timer;
+}
+
+void A4988::Kill() {
+	m_stepsRemaining = 0;
+	DisableIRQ();
 }
 
 void A4988::Enable() {
@@ -94,11 +103,23 @@ void A4988::Move(float cm, float feed) {
 
 	float delta = cm - m_currentLocation;
 
+	Serial.print(m_axisName);
+	Serial.print(" ");
+	Serial.print(cm);
+	Serial.print(" ");
+	Serial.println(delta);
+
 	m_ForwardDirection = delta > 0;
 
 	digitalWrite(m_dirPin, m_ForwardDirection ? HIGH : LOW);
 
-	m_stepsRemaining = abs(delta * 300);
+	m_stepsRemaining = abs(delta * 80);
+
+	Serial.print(m_axisName);
+	Serial.print(" ");
+	Serial.print(cm);
+	Serial.print(" ");
+	Serial.println(m_stepsRemaining);
 
 	if (m_timer == -1) {
 		while (m_stepsRemaining > 0) {
@@ -125,21 +146,26 @@ void A4988::Move(float cm, float feed) {
 				m_maxSwitchTripped = true;
 			}
 		}
+
+		m_currentLocation = cm;
 	}
 	else {
+		m_destinationCM = cm;
 		EnalableIRQ(150);
 	}
 
-	m_currentLocation = cm;
+
 }
 
 void A4988::Home()
 {
 	bool endStopHit = false;
 	digitalWrite(m_dirPin, LOW);
+	m_bHoming = true;
 
 	while (endStopHit == false)
 	{
+
 		digitalWrite(m_stepPin, HIGH);
 		delayMicroseconds(250);
 
@@ -149,6 +175,8 @@ void A4988::Home()
 		endStopHit = digitalRead(m_minLimitPin) == LOW;
 	}
 
+	m_bHoming = false;
+
 	m_currentLocation = 0;
 }
 
@@ -157,19 +185,22 @@ void A4988::ClearLimitSwitches() {
 	m_maxSwitchTripped = false;
 }
 
-void A4988::Update()
-{
+void A4988::Update() {
 	if (m_lastToggleType == LOW) {
 		digitalWrite(m_stepPin, HIGH);
-	}
-	else if (m_lastToggleType == HIGH) {
-		digitalWrite(m_stepPin, LOW);
-		m_stepsRemaining--;
+		m_lastToggleType = HIGH;
 		if (m_stepsRemaining == 0) {
 			DisableIRQ();
 		}
 	}
-
+	else if (m_lastToggleType == HIGH) {
+		digitalWrite(m_stepPin, LOW);
+		m_stepsRemaining--;
+		m_lastToggleType = LOW;
+		if (m_stepsRemaining == 0) {
+			DisableIRQ();
+		}
+	}
 	if (!m_ForwardDirection && m_minLimitPin != -1 && digitalRead(m_minLimitPin) == LOW)
 	{
 		Serial.println(m_axisName);

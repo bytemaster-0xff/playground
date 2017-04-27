@@ -86,6 +86,7 @@ enum CommandTypes
 
 
 int _currentTool = 0;
+int _hasPart = 0;
 
 ParserState _parserState;
 WordTypes _wordType;
@@ -175,8 +176,10 @@ void setup() {
 
 	XAxis.SetMaxLimitPin(XMAX);
 	XAxis.SetMinLimitPin(XMIN);
+	XAxis.SetISRTimer(1);
 	YAxis.SetMaxLimitPin(XMAX);
 	YAxis.SetMinLimitPin(XMIN);
+	YAxis.SetISRTimer(2);
 
 	ZPlace.SetMinLimitPin(PNPHEADMAX);
 	ZSolder.SetMinLimitPin(SOLDERPASTEMAX);
@@ -302,17 +305,33 @@ void GetCommand()
 
 	if (ch == '?')
 	{
-		Serial.print("<XPOS:");
+		Serial.print("<Idle,");		
+		Serial.print("MPos:");
 		Serial.print(XAxis.GetCurrentLocation(), 4);
-		Serial.print(",YPOS:");
+		Serial.print(",");
 		Serial.print(YAxis.GetCurrentLocation(), 4);
-		Serial.print(",CPOS:");
-		Serial.print(CAxis.GetCurrentLocation(), 4);
-		Serial.print(",PPOS:");
+		Serial.print(",");
 		Serial.print(ZPlace.GetCurrentLocation(), 4);
-		Serial.print(",SPOS:");
+		Serial.print(",");
 		Serial.print(ZSolder.GetCurrentLocation(), 4);
+		Serial.print(",");
+		Serial.print(CAxis.GetCurrentLocation(), 4);
+		Serial.print(",");
+		Serial.print("WPos:0,0,0,0,0,");
+		Serial.print("T:");
+		Serial.print(_currentTool);
+		Serial.print(",");
+		Serial.print("P:");
+		Serial.print(_hasPart);
 		Serial.println(">");
+		return;
+	}
+	if (ch == '!' || ch == 0x18) {
+		XAxis.Kill();
+		YAxis.Kill();
+		ZPlace.Kill();
+		ZSolder.Kill();
+		CAxis.Kill();
 		return;
 	}
 

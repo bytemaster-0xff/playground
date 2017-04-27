@@ -11,9 +11,12 @@
 
 class A4988 {
 private:
+	float m_destinationCM;
 	long m_stepsRemaining;
 	uint8_t m_lastToggleType;
 	bool m_ForwardDirection;
+
+	bool m_bHoming = false;
 
 	uint8_t m_timer = -1;
 	uint8_t m_dirPin;
@@ -37,6 +40,7 @@ public:
 	void SetMinLimitPin(uint8_t maxLimit);
 	void SetMaxLimitPin(uint8_t maxLimit);
 	void Enable();
+	void Kill();
 	void Disable();
 	void SetISRTimer(uint8_t timer);
 	void Home();
