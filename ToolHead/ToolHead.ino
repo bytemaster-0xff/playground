@@ -94,6 +94,9 @@ int _intCmd;
 byte _commandBufferHead;
 byte _commandBufferTail;
 
+String _state;
+bool _alarmCondition = false;
+
 typedef struct GCodeCommand
 {
 	CommandTypes CommandType;
@@ -182,6 +185,8 @@ void EnableTimer2() {
 void setup() {
 	Serial.begin(115200);
 	Serial.write("online");
+
+	_state = "Idle";
 
 	XAxis.SetMaxLimitPin(XMAX);
 	XAxis.SetMinLimitPin(XMIN);
@@ -301,6 +306,21 @@ bool IsCurrentCommandMovement() {
 
 }
 
+void SetAlarmMode() {
+	_state = "Alarm";
+	XAxis.Kill();
+	YAxis.Kill();
+	ZPaste.Kill();
+	ZPlace.Kill();
+	CAxis.Kill();
+	_alarmCondition = true;
+}
+
+void ClearAlarmMode() {
+	_state = "Idle";
+	_alarmCondition = false;
+}
+
 
 void GetCommand()
 {
@@ -315,7 +335,9 @@ void GetCommand()
 
 	if (ch == '?')
 	{
-		Serial.print("<Idle,");
+		Serial.print("<");
+		Serial.print(_state);
+		Serial.print(",");
 		Serial.print("MPos:");
 		Serial.print(XAxis.GetCurrentLocation(), 4);
 		Serial.print(",");
@@ -352,6 +374,16 @@ void GetCommand()
 		ZPlace.Kill();
 		ZPaste.Kill();
 		CAxis.Kill();
+		return;
+	}
+
+	/* ACK */
+	if (ch == 0x06) {
+		ClearAlarmMode();
+	}
+
+	/* Ignore everything until alarm cleared */
+	if (_alarmCondition) {
 		return;
 	}
 

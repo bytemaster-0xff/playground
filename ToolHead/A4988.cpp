@@ -5,6 +5,8 @@
 #include "A4988.h"
 #include <EEPROM.h>
 
+extern void SetAlarmMode();
+
 
 #define EEPROM_WORKSPACEOFFSET 0 
 
@@ -154,8 +156,9 @@ void A4988::Update() {
 	if (!m_ForwardDirection && m_minLimitPin != -1 && digitalRead(m_minLimitPin) == LOW)
 	{
 		if (!m_bHoming) {
-			Serial.println(String("<EndStop:min," + m_axisName + ">"));
+			Serial.println(String("<EndStop:" + m_axisName + ",min>"));
 			m_minSwitchTripped = true;
+			SetAlarmMode();
 		}
 		else {
 			m_bHoming = false;
@@ -167,8 +170,9 @@ void A4988::Update() {
 
 	if (m_ForwardDirection && m_maxLimitPin != -1 && digitalRead(m_maxLimitPin) == LOW)
 	{
-		Serial.println("<EndStop:max," + m_axisName + ">");
+		Serial.println("<EndStop:" + m_axisName + ",max>");
 		IsBusy = false;
+		SetAlarmMode();
 	}
 
 	if (m_lastToggleType == LOW) {
