@@ -11,13 +11,17 @@
 
 class A4988 {
 private:
-	float m_destinationCM;
+	float m_destinationLocation;
+	float m_startLocation;
+	long m_totalSteps;
+	float m_moveLength;
 	long m_stepsRemaining;
 	uint8_t m_lastToggleType;
 	bool m_ForwardDirection;
 
 	bool m_bHoming = false;
-
+	float m_worksetOffset;
+	int8_t m_eepromStartAddr;
 	int8_t m_timer = -1;
 	uint8_t m_dirPin;
 	uint8_t m_stepPin;
@@ -25,15 +29,15 @@ private:
 	int8_t m_maxLimitPin = -1;
 	int8_t m_minLimitPin = -1;
 	String m_axisName;
-	bool m_isBusy = false;
+	
 	bool m_minSwitchTripped = false;
 	bool m_maxSwitchTripped = false;
-	float m_currentLocation;
-	void EnalableIRQ(int uSec);
-	void DisableIRQ();
+	float m_currentMachineLocation;	
 
 public:
-	A4988(int dirPin, int stepPin, int enablePin, String axiSName);
+	A4988(int dirPin, int stepPin, int enablePin, String axiSName, int eepromStartAddr);
+
+	bool IsBusy = false;
 
 	float GetCurrentLocation();
 	void Move(float cm, float feed);
@@ -47,6 +51,8 @@ public:
 	void ClearLimitSwitches();
 	bool GetIsBusy();
 	void Update();
+	float GetWorkspaceOffset();
+	void SetWorkspaceOffset(float value);
 };
 
 #endif

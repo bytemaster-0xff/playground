@@ -3,9 +3,12 @@
 // 
 
 #include "A4988.h"
+#include <EEPROM.h>
 
 
-A4988::A4988(int dirPin, int stepPin, int enablePin, String axisName) {
+#define EEPROM_WORKSPACEOFFSET 0 
+
+A4988::A4988(int dirPin, int stepPin, int enablePin, String axisName, int eepromStartAddr) {
 	pinMode(dirPin, OUTPUT);
 	pinMode(stepPin, OUTPUT);
 	pinMode(enablePin, OUTPUT);
@@ -15,54 +18,17 @@ A4988::A4988(int dirPin, int stepPin, int enablePin, String axisName) {
 	m_enablePin = enablePin;
 	m_axisName = axisName;
 
+	EEPROM.get(eepromStartAddr + EEPROM_WORKSPACEOFFSET, m_worksetOffset);
+	if (isnan(m_worksetOffset)) {
+		m_worksetOffset = 0.0f;
+	}
+	m_eepromStartAddr = eepromStartAddr;
+
 	Disable();
 }
 
 // FROM: http://www.instructables.com/id/Arduino-Timer-Interrupts/
-void A4988::EnalableIRQ(int uSec) {
-	if (m_timer == 1) {
-		TCCR1A = 0;// set entire TCCR1A register to 0
-		TCCR1B = 0;// same for TCCR1B
-		TCNT1 = 0;//initialize counter value to 0
-				  // set compare match register for 1hz increments
-		OCR1A = 249;// = (16*10^6) / (8000*4) - 1 (must be <256) /* 124 = 16
-					// turn on CTC mode
-		TCCR1B |= (1 << WGM12);
-		// Set CS12 and CS10 bits for 1024 prescaler
-		TCCR1B |= (1 << CS21);
-		// enable timer compare interrupt
-		TIMSK1 |= (1 << OCIE1A);
-		m_isBusy = true;
-	}
-	else if (m_timer == 2) {
-		TCCR2A = 0;// set entire TCCR2A register to 0
-		TCCR2B = 0;// same for TCCR2B
-		TCNT2 = 0;//initialize counter value to 0
-				  // set compare match register for 8khz increments
-		OCR2A = 249;// = (16*10^6) / (8000*8) - 1 (must be <256)
-					// turn on CTC mode
-		TCCR2A |= (1 << WGM21);
-		// Set CS21 bit for 8 prescaler
-		TCCR2B |= (1 << CS21);
-		// enable timer compare interrupt
-		TIMSK2 |= (1 << OCIE2A);
-		m_isBusy = true;
-	}
-}
 
-void A4988::DisableIRQ() {
-	if (m_timer == 1) {
-		TIMSK1 &= ~(1 << OCIE1A);
-		m_isBusy = false;
-		m_currentLocation = m_destinationCM;
-	}
-	else if (m_timer == 2) {
-		TIMSK2 &= ~(1 << OCIE2A);
-		m_isBusy = false;
-		m_currentLocation = m_destinationCM;
-	}
-
-}
 
 void A4988::SetMinLimitPin(uint8_t minlimitPin)
 {
@@ -80,7 +46,7 @@ void A4988::SetISRTimer(uint8_t timer) {
 
 void A4988::Kill() {
 	m_stepsRemaining = 0;
-	DisableIRQ();
+	IsBusy = false;
 }
 
 void A4988::Enable() {
@@ -91,72 +57,43 @@ void A4988::Disable() {
 	digitalWrite(m_enablePin, HIGH);
 }
 
-bool A4988::GetIsBusy()
-{
-	return m_isBusy;
-}
+//#define LOG_MOVE
+
 
 void A4988::Move(float cm, float feed) {
 	Enable();
 
-	float delta = cm - m_currentLocation;
+	float relativePosition = (m_currentMachineLocation - m_worksetOffset);
 
-	Serial.print(m_axisName);
-	Serial.print(" ");
-	Serial.print(cm);
-	Serial.print(" ");
-	Serial.println(delta);
+	float delta = cm - relativePosition;
+
+	if (delta == 0)
+	{
+		return;
+	}
 
 	m_ForwardDirection = delta > 0;
 
 	digitalWrite(m_dirPin, m_ForwardDirection ? HIGH : LOW);
+	m_destinationLocation = cm + m_worksetOffset;
+	m_startLocation = m_currentMachineLocation;
+
 
 	m_stepsRemaining = abs(delta * 80);
-
-	Serial.print(m_axisName);
-	Serial.print(" ");
-	Serial.print(m_timer);
-	Serial.print(" ");
+	m_totalSteps = m_stepsRemaining;
+	IsBusy = true;
+#ifdef LOG_MOVE
+	Serial.print(String("MOVE:"));
 	Serial.print(cm);
-	Serial.print(" ");
+	Serial.print(",");
+	Serial.print(relativePosition);
+	Serial.print(",");
+	Serial.print(m_worksetOffset);
+	Serial.print(",");
+	Serial.print(delta);
+	Serial.print(",");
 	Serial.println(m_stepsRemaining);
-
-	if (m_timer == -1) {
-		Serial.println("START");
-
-		while (m_stepsRemaining > 0) {
-			digitalWrite(m_stepPin, HIGH);
-			delayMicroseconds(150);
-			digitalWrite(m_stepPin, LOW);
-			delayMicroseconds(150);
-			m_stepsRemaining--;
-			if (!m_ForwardDirection && m_minLimitPin != -1 && digitalRead(m_minLimitPin) == LOW)
-			{
-				m_stepsRemaining = 0;
-				Serial.println(m_axisName);
-				Serial.println(" ");
-				Serial.println("MIN-LIMIT-HIT");
-				m_minSwitchTripped = true;
-			}
-
-			if (m_ForwardDirection && m_maxLimitPin != -1 && digitalRead(m_maxLimitPin) == LOW)
-			{
-				m_stepsRemaining = 0;
-				Serial.println(m_axisName);
-				Serial.println(" ");
-				Serial.println("MAX-LIMIT-HIT");
-				m_maxSwitchTripped = true;
-			}
-		}
-
-		Serial.println("END");
-
-		m_currentLocation = cm;
-	}
-	else {
-		m_destinationCM = cm;
-		EnalableIRQ(150);
-	}
+#endif
 }
 
 void A4988::Home(){
@@ -179,8 +116,19 @@ void A4988::Home(){
 
 	m_bHoming = false;
 
-	m_currentLocation = 0;
+	m_currentMachineLocation = 0;
 }
+
+float A4988::GetWorkspaceOffset() {
+	return m_worksetOffset;
+}
+
+void A4988::SetWorkspaceOffset(float value)
+{
+	m_worksetOffset = GetCurrentLocation() - value;
+	EEPROM.put(m_eepromStartAddr + EEPROM_WORKSPACEOFFSET, m_worksetOffset);
+}
+
 
 void A4988::ClearLimitSwitches() {
 	m_minSwitchTripped = false;
@@ -188,12 +136,44 @@ void A4988::ClearLimitSwitches() {
 }
 
 void A4988::Update() {
+	if (!IsBusy) {
+		return;
+	}
+
+	if (m_totalSteps > 0) {
+		float percentComplete = (m_totalSteps - m_stepsRemaining) / m_totalSteps;
+		float distanceMoved = m_moveLength * percentComplete;
+		if (m_ForwardDirection) {
+			m_currentMachineLocation += distanceMoved;
+		}
+		else {
+			m_currentMachineLocation -= distanceMoved;
+		}
+	}
+
+	if (!m_ForwardDirection && m_minLimitPin != -1 && digitalRead(m_minLimitPin) == LOW)
+	{
+		if (!m_bHoming) {
+			Serial.println(String("<EndStop:min," + m_axisName + ">"));
+			m_minSwitchTripped = true;
+		}
+		else {
+			m_bHoming = false;
+			m_currentMachineLocation = 0;
+		}
+
+		IsBusy = false;
+	}
+
+	if (m_ForwardDirection && m_maxLimitPin != -1 && digitalRead(m_maxLimitPin) == LOW)
+	{
+		Serial.println("<EndStop:max," + m_axisName + ">");
+		IsBusy = false;
+	}
+
 	if (m_lastToggleType == LOW) {
 		digitalWrite(m_stepPin, HIGH);
 		m_lastToggleType = HIGH;
-		if (m_stepsRemaining == 0) {
-			DisableIRQ();
-		}
 	}
 	else if (m_lastToggleType == HIGH) {
 		digitalWrite(m_stepPin, LOW);
@@ -201,39 +181,15 @@ void A4988::Update() {
 			m_stepsRemaining--;
 		}
 
-		m_lastToggleType = LOW;
-		if (m_stepsRemaining == 0) {
-			DisableIRQ();
-		}
-	}
-	if (!m_ForwardDirection && m_minLimitPin != -1 && digitalRead(m_minLimitPin) == LOW)
-	{
-		if (!m_bHoming) {
-			Serial.println("<EndStop:");
-			Serial.println(",min,");
-			Serial.println(m_axisName);
-			Serial.println(">");
-			m_minSwitchTripped = true;
-		}
-		else {
-			m_bHoming = false;
-			m_currentLocation = 0;
-		}
-
-		DisableIRQ();
+		m_lastToggleType = LOW;	
 	}
 
-	if (m_ForwardDirection && m_maxLimitPin != -1 && digitalRead(m_maxLimitPin) == LOW)
-	{
-		Serial.println("<EndStop:");
-		Serial.println(",max,");
-		Serial.println(m_axisName);
-		Serial.println(">");
-
-		DisableIRQ();
-	}
+	if (m_stepsRemaining == 0) {
+		IsBusy = false;
+		m_currentMachineLocation = m_destinationLocation;
+	}	
 }
 
 float A4988::GetCurrentLocation() {
-	return m_currentLocation;
+	return m_currentMachineLocation;
 }

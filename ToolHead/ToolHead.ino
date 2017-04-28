@@ -1,5 +1,5 @@
 
-
+#include <EEPROM.h>
 #include "A4988.h"
 #define DELAY_MICRO_SECONDS 5000
 
@@ -34,7 +34,6 @@
 #define UPPER_LIGHT 9
 #define LOWER_LIGHT 8
 #define SOLENOID 10
-
 
 #define COMMAND_BUFFER_LENGTH 20
 #define GCODE_LINE_BUFFER_LENGTH 50
@@ -129,12 +128,11 @@ typedef struct GCodeCommand
 
 GCodeCommand_t CommandBuffer[COMMAND_BUFFER_LENGTH];
 
-A4988 XAxis(XDIR, XSTEP, XENABLE, "X");
-A4988 YAxis(YDIR, YSTEP, YENABLE, "Y");
-A4988 CAxis(ZDIR, ZSTEP, ZENABLE, "C");
-A4988 ZPlace(E0DIR, E0STEP, E0ENABLE, "PLACE");
-A4988 ZSolder(E1DIR, E1STEP, E1ENABLE, "SOLDER");
-
+A4988 XAxis(XDIR, XSTEP, XENABLE, "X", 100);
+A4988 YAxis(YDIR, YSTEP, YENABLE, "Y", 132);
+A4988 CAxis(ZDIR, ZSTEP, ZENABLE, "C", 164);
+A4988 ZPlace(E0DIR, E0STEP, E0ENABLE, "PLACE", 196);
+A4988 ZPaste(E1DIR, E1STEP, E1ENABLE, "SOLDER", 228);
 
 void ResetWord(int idx) {
 	CommandBuffer[idx].Command = -1;
@@ -167,6 +165,19 @@ void initCommandBuffer()
 	}
 }
 
+void EnableTimer2() {
+	TCCR2A = 0;// set entire TCCR2A register to 0
+	TCCR2B = 0;// same for TCCR2B
+	TCNT2 = 0;//initialize counter value to 0
+			  // set compare match register for 8khz increments
+	OCR2A = 249;// = (16*10^6) / (8000*8) - 1 (must be <256)
+				// turn on CTC mode
+	TCCR2A |= (1 << WGM21);
+	// Set CS21 bit for 8 prescaler
+	TCCR2B |= (1 << CS21);
+	// enable timer compare interrupt
+	TIMSK2 |= (1 << OCIE2A);
+}
 
 void setup() {
 	Serial.begin(115200);
@@ -180,7 +191,7 @@ void setup() {
 	YAxis.SetISRTimer(2);
 
 	ZPlace.SetMinLimitPin(PNPHEADMAX);
-	ZSolder.SetMinLimitPin(SOLDERPASTEMAX);
+	ZPaste.SetMinLimitPin(SOLDERPASTEMAX);
 
 	// put your setup code here, to run once:
 	pinMode(UPPER_LIGHT, OUTPUT);
@@ -194,6 +205,7 @@ void setup() {
 	pinMode(SOLDERPASTEMAX, INPUT);
 	pinMode(PNPHEADMAX, INPUT);
 
+	EnableTimer2();
 
 	initCommandBuffer();
 
@@ -204,12 +216,12 @@ void setup() {
 	memset(wordBuffer, 0, WORD_BUFFER_LENGTH);
 }
 
-ISR(TIMER1_COMPA_vect) {
-	XAxis.Update();
-}
-
 ISR(TIMER2_COMPA_vect) {
+	XAxis.Update();
 	YAxis.Update();
+	ZPaste.Update();
+	ZPlace.Update();
+	CAxis.Update();
 }
 
 void ParseWord()
@@ -311,11 +323,21 @@ void GetCommand()
 		Serial.print(",");
 		Serial.print(ZPlace.GetCurrentLocation(), 4);
 		Serial.print(",");
-		Serial.print(ZSolder.GetCurrentLocation(), 4);
+		Serial.print(ZPaste.GetCurrentLocation(), 4);
 		Serial.print(",");
 		Serial.print(CAxis.GetCurrentLocation(), 4);
 		Serial.print(",");
-		Serial.print("WPos:0,0,0,0,0,");
+		Serial.print("WPos:");
+		Serial.print(XAxis.GetWorkspaceOffset(), 4);
+		Serial.print(",");
+		Serial.print(YAxis.GetWorkspaceOffset(), 4);
+		Serial.print(",");
+		Serial.print(ZPlace.GetWorkspaceOffset(), 4);
+		Serial.print(",");
+		Serial.print(ZPaste.GetWorkspaceOffset(), 4);
+		Serial.print(",");
+		Serial.print(CAxis.GetWorkspaceOffset(), 4);
+		Serial.print(",");
 		Serial.print("T:");
 		Serial.print(_currentTool);
 		Serial.print(",");
@@ -328,7 +350,7 @@ void GetCommand()
 		XAxis.Kill();
 		YAxis.Kill();
 		ZPlace.Kill();
-		ZSolder.Kill();
+		ZPaste.Kill();
 		CAxis.Kill();
 		return;
 	}
@@ -407,6 +429,10 @@ void GetCommand()
 				_wordType = ExpectingXLocation;
 			}
 
+			_parserState = PendingNextWord;
+			break;
+		case 'L':
+			/* TODO This likely needs some updates */
 			_parserState = PendingNextWord;
 			break;
 		case 'Y':
@@ -511,7 +537,7 @@ void EnableMotors() {
 		if (current.HasZParameter) {
 			switch (_currentTool) {
 			case 0: ZPlace.Enable(); break;
-			case 1: ZSolder.Enable(); break;
+			case 1: ZPaste.Enable(); break;
 			}
 
 		}
@@ -521,7 +547,7 @@ void EnableMotors() {
 		YAxis.Enable();
 		CAxis.Enable();
 		ZPlace.Enable();
-		ZSolder.Enable();
+		ZPaste.Enable();
 	}
 }
 
@@ -536,7 +562,7 @@ void DisableMotors() {
 		if (current.HasZParameter) {
 			switch (_currentTool) {
 			case 0: ZPlace.Enable(); break;
-			case 1: ZSolder.Enable(); break;
+			case 1: ZPaste.Enable(); break;
 			}
 		}
 	}
@@ -545,7 +571,7 @@ void DisableMotors() {
 		YAxis.Disable();
 		CAxis.Disable();
 		ZPlace.Disable();
-		ZSolder.Disable();
+		ZPaste.Disable();
 	}
 }
 
@@ -565,7 +591,7 @@ void Home() {
 				ZPlace.Home();
 			}
 			else {
-				ZSolder.Home();
+				ZPaste.Home();
 			}
 		}
 	}
@@ -574,7 +600,7 @@ void Home() {
 		XAxis.Home();
 		YAxis.Home();
 		ZPlace.Home();
-		ZSolder.Home();
+		ZPaste.Home();
 	}
 }
 
@@ -594,12 +620,42 @@ void LinearMove() {
 			ZPlace.Move(current.ZLocation, current.Feed);
 		}
 		else {
-			ZSolder.Move(current.ZLocation, current.Feed);
+			ZPaste.Move(current.ZLocation, current.Feed);
 		}
 	}
 
 	if (current.HasCParameter) {
 		CAxis.Move(current.CLocation, current.Feed);
+	}
+
+	/* Axis get configurated in IRQ, should still do SerialData input check. */
+	while (XAxis.IsBusy || YAxis.IsBusy || CAxis.IsBusy || ZPaste.IsBusy || ZPlace.IsBusy) {
+		GetCommand();
+	}
+}
+
+void SetWorkspaceLocation() {
+	GCodeCommand current = CommandBuffer[_commandBufferTail];
+
+	if (current.HasXParameter) {
+		XAxis.SetWorkspaceOffset(current.XLocation);
+	}
+
+	if (current.HasYParameter) {
+		YAxis.SetWorkspaceOffset(current.YLocation);
+	}
+
+	if (current.HasCParameter){
+		CAxis.SetWorkspaceOffset(current.CLocation);
+	}
+
+	if (current.HasZParameter) {
+		if (_currentTool == 0) {
+			ZPlace.SetWorkspaceOffset(current.CLocation);						
+		}
+		else if(_currentTool == 1) {
+			ZPaste.SetWorkspaceOffset(current.CLocation);
+		}
 	}
 }
 
@@ -640,8 +696,8 @@ void ProcessCommand()
 		case 2:
 		case 3: ArcMove();
 			break;
-		case 4: Dwell();
-			break;
+		case 4: Dwell(); break;
+		case 10: SetWorkspaceLocation(); break;
 		case 28: Home(); break;
 		}
 		break;
@@ -687,9 +743,6 @@ void loop() {
 	{
 		ProcessCommand();
 	}
-
-
-
 	/*  // put your main code here, to run repeatedly:
 	  */
 }
