@@ -28,6 +28,8 @@ private:
 	uint8_t m_enablePin;	
 	int8_t m_maxLimitPin = -1;
 	int8_t m_minLimitPin = -1;
+	int8_t m_updatesPerCount = 1;
+	int8_t m_updatesCount = 0;
 	String m_axisName;
 	
 	bool m_minSwitchTripped = false;
@@ -43,13 +45,12 @@ public:
 	void Move(float cm, float feed);
 	void SetMinLimitPin(uint8_t maxLimit);
 	void SetMaxLimitPin(uint8_t maxLimit);
+	void SetUpdatesPerCount(uint8_t updatesPerStep);
 	void Enable();
 	void Kill();
 	void Disable();
-	void SetISRTimer(uint8_t timer);
 	void Home();
 	void ClearLimitSwitches();
-	bool GetIsBusy();
 	void Update();
 	float GetWorkspaceOffset();
 	void SetWorkspaceOffset(float value);

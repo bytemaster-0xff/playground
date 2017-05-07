@@ -42,10 +42,6 @@ void A4988::SetMaxLimitPin(uint8_t maxLimitPin)
 	m_maxLimitPin = maxLimitPin;
 }
 
-void A4988::SetISRTimer(uint8_t timer) {
-	m_timer = timer;
-}
-
 void A4988::Kill() {
 	m_stepsRemaining = 0;
 	IsBusy = false;
@@ -131,6 +127,9 @@ void A4988::SetWorkspaceOffset(float value)
 	EEPROM.put(m_eepromStartAddr + EEPROM_WORKSPACEOFFSET, m_worksetOffset);
 }
 
+void A4988::SetUpdatesPerCount(uint8_t updatesPerStep){
+	m_updatesPerCount = updatesPerStep;
+}
 
 void A4988::ClearLimitSwitches() {
 	m_minSwitchTripped = false;
@@ -140,6 +139,12 @@ void A4988::ClearLimitSwitches() {
 void A4988::Update() {
 	if (!IsBusy) {
 		return;
+	}
+	if (m_updatesCount-- > 1) {
+		return;
+	}
+	else {
+		m_updatesCount = m_updatesPerCount;
 	}
 
 	if (m_totalSteps > 0) {

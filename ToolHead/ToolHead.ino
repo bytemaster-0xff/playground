@@ -3,6 +3,12 @@
 #include "A4988.h"
 #define DELAY_MICRO_SECONDS 5000
 
+#define SBI(n,b) (n |= _BV(b))
+#define CBI(n,b) (n &= ~_BV(b))
+
+#define ENABLE_STEPPER_DRIVER_INTERRUPT()  SBI(TIMSK1, OCIE1A)
+#define DISABLE_STEPPER_DRIVER_INTERRUPT() CBI(TIMSK1, OCIE1A)
+
 
 #define XMAX 2
 #define XMIN 3
@@ -169,18 +175,56 @@ void initCommandBuffer()
 }
 
 void EnableTimer2() {
-	TCCR2A = 0;// set entire TCCR2A register to 0
-	TCCR2B = 0;// same for TCCR2B
-	TCNT2 = 0;//initialize counter value to 0
+	TCCR1A = 0;// set entire TCCR2A register to 0
+	TCCR1B = 0;// same for TCCR2B
+	TCNT1 = 0;//initialize counter value to 0
 			  // set compare match register for 8khz increments
-	OCR2A = 249;// = (16*10^6) / (8000*8) - 1 (must be <256)
+
+	OCR1A = 61;// = (16*10^6) / (8000*8) - 1 (must be <256)
 				// turn on CTC mode
-	TCCR2A |= (1 << WGM21);
+
+	//OCR2A = 16;// = (16*10^6) / (8000*8) - 1 (must be <256)
+
+	//TCCR1A |= (1 << WGM12);
+	TCCR1A |= (1 << WGM11);
+
+	//bitSet(TCCR2B, CS21);
 	// Set CS21 bit for 8 prescaler
-	TCCR2B |= (1 << CS21);
+	//TCCR1B |= (1 << CS11);
+	TCCR1B |= (1 << CS10);
+	//TCCR2B |= (1 << CS20);
+
+
 	// enable timer compare interrupt
-	TIMSK2 |= (1 << OCIE2A);
+	TIMSK1 |= (1 << OCIE1A);
 }
+
+/*
+*Stepper Driver Interrupt
+*
+* Directly pulses the stepper motors at high frequency.
+* Timer 1 runs at a base frequency of 2MHz, with this ISR using OCR1A compare mode.
+*
+* OCR1A   Frequency
+* 1     2 MHz 0.5uSeconds
+* 50    40 KHz 25 uSeconds
+* 100    20 KHz - 50 uSeconds
+* 200    10 KHz - 100 uSeconds
+* 2000     1 KHz - 1ms
+* 4000   500  Hz - 500ms
+*/
+
+ISR(TIMER1_COMPA_vect) {
+	//for (int idx = 0; idx < 4; ++idx) {
+		XAxis.Update();
+		YAxis.Update();
+		ZPaste.Update();
+		ZPlace.Update();
+		CAxis.Update();
+		delayMicroseconds(25);
+	//}
+}
+
 
 void setup() {
 	Serial.begin(115200);
@@ -190,13 +234,15 @@ void setup() {
 
 	XAxis.SetMaxLimitPin(XMAX);
 	XAxis.SetMinLimitPin(XMIN);
-	XAxis.SetISRTimer(1);
 	YAxis.SetMaxLimitPin(YMAX);
 	YAxis.SetMinLimitPin(YMIN);
-	YAxis.SetISRTimer(2);
 
 	ZPlace.SetMinLimitPin(PNPHEADMAX);
+	ZPlace.SetUpdatesPerCount(20);
 	ZPaste.SetMinLimitPin(SOLDERPASTEMAX);
+	ZPlace.SetUpdatesPerCount(20);
+
+	CAxis.SetMinLimitPin(PNPHEADMAX);
 
 	// put your setup code here, to run once:
 	pinMode(UPPER_LIGHT, OUTPUT);
@@ -219,14 +265,6 @@ void setup() {
 	wordBufferIndex = 0;
 	memset(buffer, 0, GCODE_LINE_BUFFER_LENGTH);
 	memset(wordBuffer, 0, WORD_BUFFER_LENGTH);
-}
-
-ISR(TIMER2_COMPA_vect) {
-	XAxis.Update();
-	YAxis.Update();
-	ZPaste.Update();
-	ZPlace.Update();
-	CAxis.Update();
 }
 
 void ParseWord()
