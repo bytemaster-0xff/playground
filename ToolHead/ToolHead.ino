@@ -31,7 +31,6 @@
 #define ZSTEP 46
 #define ZDIR 48
 
-
 #define E0STEP 26
 #define E0DIR 28
 #define E1STEP 36
@@ -91,6 +90,10 @@ enum CommandTypes
 };
 
 int _currentTool = 0;
+#define TOOL_PLACE 0
+#define TOOL_PASTE 1
+#define TOOL_CAXIS 2
+
 int _hasPart = 0;
 
 ParserState _parserState;
@@ -175,28 +178,22 @@ void initCommandBuffer()
 }
 
 void EnableTimer2() {
-	TCCR1A = 0;// set entire TCCR2A register to 0
-	TCCR1B = 0;// same for TCCR2B
-	TCNT1 = 0;//initialize counter value to 0
-			  // set compare match register for 8khz increments
+	noInterrupts();           // disable all interrupts
+	TCCR1A = 0;
+	TCCR1B = 0;
+	TCNT1 = 0;
 
-	OCR1A = 61;// = (16*10^6) / (8000*8) - 1 (must be <256)
-				// turn on CTC mode
-
-	//OCR2A = 16;// = (16*10^6) / (8000*8) - 1 (must be <256)
-
-	//TCCR1A |= (1 << WGM12);
-	TCCR1A |= (1 << WGM11);
-
-	//bitSet(TCCR2B, CS21);
-	// Set CS21 bit for 8 prescaler
-	//TCCR1B |= (1 << CS11);
-	TCCR1B |= (1 << CS10);
-	//TCCR2B |= (1 << CS20);
+	CBI(TCCR1B, WGM13);
+	SBI(TCCR1B, WGM12);
+	CBI(TCCR1A, WGM11);
+	CBI(TCCR1A, WGM10);
 
 
-	// enable timer compare interrupt
-	TIMSK1 |= (1 << OCIE1A);
+	OCR1A = 100;            // compare match register 16MHz/256/2Hz
+	//TCCR1B |= (1 << WGM12);   // CTC mode
+	TCCR1B |= (1 << CS11);    // 256 prescaler 
+	TIMSK1 |= (1 << OCIE1A);  // enable timer compare interrupt
+	interrupts();
 }
 
 /*
@@ -214,21 +211,33 @@ void EnableTimer2() {
 * 4000   500  Hz - 500ms
 */
 
+bool toggled = false;
+
 ISR(TIMER1_COMPA_vect) {
 	//for (int idx = 0; idx < 4; ++idx) {
-		XAxis.Update();
-		YAxis.Update();
-		ZPaste.Update();
-		ZPlace.Update();
-		CAxis.Update();
-		delayMicroseconds(25);
-	//}
+	XAxis.Update();
+	YAxis.Update();
+	ZPaste.Update();
+	ZPlace.Update();
+	CAxis.Update();
+
+	if (toggled)
+		digitalWrite(16, LOW);
+	else
+		digitalWrite(16, HIGH);
+
+	toggled = !toggled;
+
+	//		delayMicroseconds(25);
+		//}
 }
 
 
 void setup() {
+	delay(1500);
+
 	Serial.begin(115200);
-	Serial.write("online");
+	Serial.println("online");
 
 	_state = "Idle";
 
@@ -236,13 +245,15 @@ void setup() {
 	XAxis.SetMinLimitPin(XMIN);
 	YAxis.SetMaxLimitPin(YMAX);
 	YAxis.SetMinLimitPin(YMIN);
+	YAxis.SetUpdatesPerCount(1);
 
 	ZPlace.SetMinLimitPin(PNPHEADMAX);
 	ZPlace.SetUpdatesPerCount(20);
 	ZPaste.SetMinLimitPin(SOLDERPASTEMAX);
-	ZPlace.SetUpdatesPerCount(20);
+	ZPaste.SetUpdatesPerCount(20);
 
 	CAxis.SetMinLimitPin(PNPHEADMAX);
+	CAxis.SetUpdatesPerCount(5);
 
 	// put your setup code here, to run once:
 	pinMode(UPPER_LIGHT, OUTPUT);
@@ -255,6 +266,8 @@ void setup() {
 	pinMode(YMIN, INPUT);
 	pinMode(SOLDERPASTEMAX, INPUT);
 	pinMode(PNPHEADMAX, INPUT);
+
+	pinMode(16, OUTPUT);
 
 	EnableTimer2();
 
@@ -518,7 +531,7 @@ void GetCommand()
 			ParseWord();
 			CommandBuffer[_commandBufferHead].HasCParameter = true;
 			if (IsCurrentCommandMovement()) {
-				_wordType = ExpectingCLocation;				
+				_wordType = ExpectingCLocation;
 			}
 
 			_parserState = PendingNextWord;
@@ -527,7 +540,7 @@ void GetCommand()
 			ParseWord();
 			CommandBuffer[_commandBufferHead].HasZParameter = true;
 			if (IsCurrentCommandMovement()) {
-				_wordType = ExpectingZLocation;				
+				_wordType = ExpectingZLocation;
 			}
 
 			_parserState = PendingNextWord;
@@ -606,8 +619,9 @@ void EnableMotors() {
 		if (current.HasCParameter) CAxis.Enable();
 		if (current.HasZParameter) {
 			switch (_currentTool) {
-			case 0: ZPlace.Enable(); break;
-			case 1: ZPaste.Enable(); break;
+			case TOOL_PLACE: ZPlace.Enable(); break;
+			case TOOL_PASTE: ZPaste.Enable(); break;
+			case TOOL_CAXIS: CAxis.Enable(); break;
 			}
 
 		}
@@ -628,11 +642,11 @@ void DisableMotors() {
 	{
 		if (current.HasXParameter) XAxis.Disable();
 		if (current.HasYParameter) YAxis.Disable();
-		if (current.HasCParameter) CAxis.Disable();
 		if (current.HasZParameter) {
 			switch (_currentTool) {
-			case 0: ZPlace.Enable(); break;
-			case 1: ZPaste.Enable(); break;
+			case TOOL_PLACE: ZPlace.Disable(); break;
+			case TOOL_PASTE: ZPaste.Disable(); break;
+			case TOOL_CAXIS: CAxis.Disable(); break;
 			}
 		}
 	}
@@ -657,11 +671,10 @@ void Home() {
 			YAxis.Home();
 		}
 		if (current.HasZParameter) {
-			if (_currentTool == 0) {
-				ZPlace.Home();
-			}
-			else {
-				ZPaste.Home();
+			switch (_currentTool)
+			{
+			case TOOL_PLACE: ZPlace.Home(); break;
+			case TOOL_PASTE: ZPaste.Home(); break;
 			}
 		}
 	}
@@ -676,32 +689,63 @@ void Home() {
 
 void LinearMove() {
 	GCodeCommand current = CommandBuffer[_commandBufferTail];
+	unsigned long start = millis();
+
+	Serial.println(millis());
+
+	float xDelta = 0;
 
 	if (current.HasXParameter) {
+		xDelta = abs(current.XLocation - XAxis.GetCurrentLocation());
 		XAxis.Move(current.XLocation, current.Feed);
+		
 	}
 
+	float yDelta = 0;
+
 	if (current.HasYParameter) {
+		yDelta = abs(current.YLocation - YAxis.GetCurrentLocation());
 		YAxis.Move(current.YLocation, current.Feed);
 	}
 
+	
 	if (current.HasZParameter) {
-		if (_currentTool == 0) {
-			ZPlace.Move(current.ZLocation, current.Feed);
-		}
-		else {
-			ZPaste.Move(current.ZLocation, current.Feed);
+		switch (_currentTool)
+		{
+		case TOOL_PLACE: ZPlace.Move(current.ZLocation, current.Feed); break;
+		case TOOL_PASTE: ZPaste.Move(current.ZLocation, current.Feed); break;
+		case TOOL_CAXIS: CAxis.Move(current.ZLocation, current.Feed); break;
 		}
 	}
 
-	if (current.HasCParameter) {
-		CAxis.Move(current.CLocation, current.Feed);
-	}
-
-	/* Axis get configurated in IRQ, should still do SerialData input check. */
+	/* Axis get checked in IRQ, should still do SerialData input check. */
 	while (XAxis.IsBusy || YAxis.IsBusy || CAxis.IsBusy || ZPaste.IsBusy || ZPlace.IsBusy) {
 		GetCommand();
 	}
+
+	unsigned long delta = millis() - start;
+
+	Serial.println(millis());
+
+	if (xDelta > 0)
+	{
+		Serial.print("Feet Per Minute X: ");
+		Serial.print((xDelta / delta) * 60, 2);
+		Serial.println("ms");
+	}
+	
+	if (yDelta > 0)
+	{
+		Serial.print("Y:  ");
+		Serial.print(delta / 1000.0);
+		Serial.print("ms ");
+		Serial.print(yDelta, 2);
+		Serial.print("mm ");
+		Serial.print((yDelta / (delta / 1000.0)) * 60, 2);
+		Serial.print("mm/min ");
+		Serial.println("mm/min");
+	}
+
 }
 
 void SetWorkspaceLocation() {
@@ -715,17 +759,17 @@ void SetWorkspaceLocation() {
 		YAxis.SetWorkspaceOffset(current.YLocation);
 	}
 
-	if (current.HasCParameter){
+	if (current.HasCParameter) {
 		CAxis.SetWorkspaceOffset(current.CLocation);
 	}
 
 	if (current.HasZParameter) {
-		if (_currentTool == 0) {
-			ZPlace.SetWorkspaceOffset(current.CLocation);						
-		}
-		else if(_currentTool == 1) {
-			ZPaste.SetWorkspaceOffset(current.CLocation);
-		}
+		switch (_currentTool)
+		{
+		case TOOL_PLACE: ZPaste.SetWorkspaceOffset(current.CLocation); break;
+		case TOOL_PASTE: ZPlace.SetWorkspaceOffset(current.CLocation); break;
+		case TOOL_CAXIS: CAxis.SetWorkspaceOffset(current.CLocation); break;
+		}		
 	}
 }
 
@@ -775,8 +819,9 @@ void ProcessCommand()
 	case TCode:
 		switch (CommandBuffer[_commandBufferTail].Command)
 		{
-		case 0: _currentTool = 0; break;
-		case 1: _currentTool = 1; break;
+		case 0: _currentTool = TOOL_PLACE; break;
+		case 1: _currentTool = TOOL_PASTE; break;
+		case 2: _currentTool = TOOL_CAXIS; break;
 		}
 		break;
 

@@ -57,8 +57,33 @@ void A4988::Disable() {
 
 //#define LOG_MOVE
 
+/*
+ *  ISR Rate               : 50 uSec
+ *  Effectice Step Rate    : 100 uSec (two IRQs per step)
+ *  ISR's Per Second       : 10000 (10K)
+ *  Steps per MM           : 80
+ *  Steps Per Second (max) : 125 = 10,000 / 80
+ *  Max/Base Fed Rate      : 125
+ */
 
-void A4988::Move(float cm, float feed) {
+#define STATE_IDLE 0
+#define STATE_ACCELERATING 1
+#define STATE_MOVING 2
+#define STATE_DECELERATING 3
+
+
+#define DEFAULT_MM_PER_SECOND 125
+#define STEPS_PER_MM 80
+ //#define STEPS_AT_ACCEL_DECL 10
+
+#define STEPS_AT_ACCEL_DECL 2
+
+ /* We will start accelerating from this IRQs per step and decellerate back down to it as well*/
+/* Start out at 100mm / min, then decement / increment by one each delta */
+#define START_ENDING_FEED_RATE 15
+
+/* Feed arrives in mm/minute*/
+void A4988::Move(float cm, float feedMMMinute) {
 	Enable();
 
 	float relativePosition = (m_currentMachineLocation - m_worksetOffset);
@@ -70,15 +95,41 @@ void A4988::Move(float cm, float feed) {
 		return;
 	}
 
+	m_stepsRemaining = abs(delta * STEPS_PER_MM);
+	m_totalSteps = m_stepsRemaining;
+
+
+
+	m_requestedFeedRate_mmSeconds = feedMMMinute / 60.0;
+	m_IRQs_PerStep = ((int)DEFAULT_MM_PER_SECOND / m_requestedFeedRate_mmSeconds);
 	m_ForwardDirection = delta > 0;
+
+	if (m_IRQs_PerStep >= 75)
+	{
+		/* For relatively slow moves, don't accel/decel */
+		m_rampDelta = 0;
+		m_IRQ_CurrentCountDown = m_IRQs_PerStep;
+	}
+	else
+	{
+		/* Starting rate for sending pulses*/
+		m_IRQs_AtAccelDecel = START_ENDING_FEED_RATE;
+
+		/* Calculate the number of steps in acceleration */
+		m_rampDelta = ((m_IRQs_AtAccelDecel - m_IRQs_PerStep) * STEPS_AT_ACCEL_DECL);
+
+		/* Used as starting point for moving*/
+		m_IRQ_CurrentCountDown = START_ENDING_FEED_RATE;
+
+		/* Count Down to when we accelerate/decelerate next*/
+		m_IRQs_AccelDecelCountDown = STEPS_AT_ACCEL_DECL;
+	}
 
 	digitalWrite(m_dirPin, m_ForwardDirection ? HIGH : LOW);
 	m_destinationLocation = cm + m_worksetOffset;
 	m_startLocation = m_currentMachineLocation;
+	m_state = STATE_IDLE;
 
-
-	m_stepsRemaining = abs(delta * 80);
-	m_totalSteps = m_stepsRemaining;
 	IsBusy = true;
 #ifdef LOG_MOVE
 	Serial.print(String("MOVE:"));
@@ -94,7 +145,7 @@ void A4988::Move(float cm, float feed) {
 #endif
 }
 
-void A4988::Home(){
+void A4988::Home() {
 	bool endStopHit = false;
 	Enable();
 
@@ -127,8 +178,64 @@ void A4988::SetWorkspaceOffset(float value)
 	EEPROM.put(m_eepromStartAddr + EEPROM_WORKSPACEOFFSET, m_worksetOffset);
 }
 
-void A4988::SetUpdatesPerCount(uint8_t updatesPerStep){
-	m_updatesPerCount = updatesPerStep;
+int A4988::GetIRQs_PerStep()
+{
+
+	switch (m_state)
+	{
+		case STATE_IDLE:
+			m_state = STATE_ACCELERATING;
+			m_rampDelta = 0;
+			break;
+		case STATE_ACCELERATING:
+			m_rampDelta++;
+
+			while (m_IRQs_AccelDecelCountDown-- > 0) {
+				return m_IRQs_AtAccelDecel;
+			}
+
+			m_IRQs_AccelDecelCountDown = 5;
+
+			m_IRQs_AtAccelDecel--;
+			if (m_IRQs_AtAccelDecel == m_IRQs_PerStep)
+			{				
+				m_state = STATE_MOVING;
+			}				
+
+			return m_IRQs_AtAccelDecel;
+		case STATE_MOVING:
+			if (m_stepsRemaining == m_rampDelta)
+			{
+				m_IRQs_AccelDecelCountDown = 5;
+				m_state = STATE_DECELERATING;
+			}
+			
+			return m_IRQs_PerStep;
+		case STATE_DECELERATING:
+			while (m_IRQs_AccelDecelCountDown-- > 0) {
+				return m_IRQs_AtAccelDecel;
+			}
+
+			m_IRQs_AccelDecelCountDown = 5;
+
+
+			m_IRQs_AtAccelDecel++;
+			if (m_stepsRemaining == 0)
+			{
+				m_state = STATE_IDLE;
+			}
+
+			m_IRQs_AtAccelDecel = min(m_IRQs_AtAccelDecel, START_ENDING_FEED_RATE);
+
+			return 	m_IRQs_AtAccelDecel;
+	}
+
+	return m_IRQs_PerStep;
+
+}
+
+void A4988::SetUpdatesPerCount(uint8_t updatesPerStep) {
+	m_IRQs_PerStep = updatesPerStep;
 }
 
 void A4988::ClearLimitSwitches() {
@@ -136,15 +243,20 @@ void A4988::ClearLimitSwitches() {
 	m_maxSwitchTripped = false;
 }
 
+#define ISR_INTERVAL_uSEC 50 //50 uSeconds
+#define BASE_STEP_INTERVAL ISR_INTERVAL_uSEC * 2
+
 void A4988::Update() {
 	if (!IsBusy) {
 		return;
 	}
-	if (m_updatesCount-- > 1) {
+
+	//Spin until we should toggle.
+	if (m_IRQ_CurrentCountDown-- > 1) {
 		return;
 	}
 	else {
-		m_updatesCount = m_updatesPerCount;
+		m_IRQ_CurrentCountDown = GetIRQs_PerStep();
 	}
 
 	if (m_totalSteps > 0) {
@@ -190,13 +302,13 @@ void A4988::Update() {
 			m_stepsRemaining--;
 		}
 
-		m_lastToggleType = LOW;	
+		m_lastToggleType = LOW;
 	}
 
 	if (m_stepsRemaining == 0) {
 		IsBusy = false;
 		m_currentMachineLocation = m_destinationLocation;
-	}	
+	}
 }
 
 float A4988::GetCurrentLocation() {

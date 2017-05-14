@@ -13,8 +13,14 @@ class A4988 {
 private:
 	float m_destinationLocation;
 	float m_startLocation;
+	float m_currentFeedRate;
 	long m_totalSteps;
+	int m_rampSteps;
+	int m_state;
+	int m_temp1;
+	int m_rampDelta;
 	float m_moveLength;
+	float m_requestedFeedRate_mmSeconds;
 	long m_stepsRemaining;
 	uint8_t m_lastToggleType;
 	bool m_ForwardDirection;
@@ -28,13 +34,22 @@ private:
 	uint8_t m_enablePin;	
 	int8_t m_maxLimitPin = -1;
 	int8_t m_minLimitPin = -1;
-	int8_t m_updatesPerCount = 1;
-	int8_t m_updatesCount = 0;
+
+	// Count down for number of steps until we accell/decel
+	uint16_t m_IRQs_AccelDecelCountDown = 0;
+
+	// Current number of steps to pause at the point in our accel/decel ramp
+	uint16_t m_IRQs_AtAccelDecel = 0;	
+	uint8_t m_IRQs_PerStep = 1;
+	uint8_t m_IRQ_CurrentCountDown = 0;
+
+
 	String m_axisName;
 	
 	bool m_minSwitchTripped = false;
 	bool m_maxSwitchTripped = false;
 	float m_currentMachineLocation;	
+	int GetIRQs_PerStep();
 
 public:
 	A4988(int dirPin, int stepPin, int enablePin, String axiSName, int eepromStartAddr);
