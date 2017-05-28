@@ -78,6 +78,7 @@ enum WordTypes
 	ExpectingJLocation,
 	ExpectingSParameter,
 	ExpectingPParameter,
+	ExpectingMParameter,
 	NotSpecified,
 };
 
@@ -232,6 +233,13 @@ ISR(TIMER1_COMPA_vect) {
 		//}
 }
 
+void Pause() {
+	CBI(TIMSK1, OCIE1A);  // disable timer compare interrupt
+}
+
+void Resume(){
+	SBI(TIMSK1, OCIE1A);  // enable timer compare interrupt
+}
 
 void setup() {
 	delay(1500);
@@ -419,7 +427,18 @@ void GetCommand()
 		Serial.println(">");
 		return;
 	}
-	if (ch == '!' || ch == 0x18) {
+
+	if(ch == '!'){
+		Pause();
+		return;
+	}
+
+	if(ch == '~') {
+		Resume();
+		return;
+	}
+
+	if (ch == 0x18) {
 		XAxis.Kill();
 		YAxis.Kill();
 		ZPlace.Kill();
@@ -779,6 +798,13 @@ void ArcMove() {
 
 void Dwell() {
 	GCodeCommand current = CommandBuffer[_commandBufferTail];
+	if(current.HasPParameter()){
+		delay(current.P * 1000);
+	}
+
+	if(current.HasXParameter()){
+		delay(current.XLocation);
+	}
 }
 
 void CheckEndStops() {
@@ -833,10 +859,15 @@ void ProcessCommand()
 		case 60: { digitalWrite(UPPER_LIGHT, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
 		case 61: { digitalWrite(LOWER_LIGHT, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
 		case 62: { digitalWrite(SOLENOID, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
+		case 70: 
+			{ 
+				Serial.print("<action:");
+				Serial.print(CommandBuffer[_commandBufferTail].PParameter);
+				Serial.println(">");
+			}; break;
 		case 119: CheckEndStops(); break;
 		}
 		break;
-
 	}
 
 	Serial.println("ok");
