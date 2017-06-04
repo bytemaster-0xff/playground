@@ -88,11 +88,12 @@ void A4988::Move(float cm, float feedMMMinute) {
 
 	float relativePosition = (m_currentMachineLocation - m_worksetOffset);
 
-	float delta =  m_absoluteMove ? cm - relativePosition : cm;
+	float delta = m_absoluteMove ? cm - relativePosition : cm;
 
 	m_stepsRemaining = abs(delta * STEPS_PER_MM);
 	if (m_stepsRemaining == 0)
 	{
+		IsBusy = false;
 		return;
 	}
 
@@ -193,54 +194,6 @@ void A4988::SetAbsoluteCoordMove()
 int A4988::GetIRQs_PerStep()
 {
 
-	switch (m_state)
-	{
-		case STATE_IDLE:
-			m_state = STATE_ACCELERATING;
-			m_rampDelta = 0;
-			break;
-		case STATE_ACCELERATING:
-			m_rampDelta++;
-
-			while (m_IRQs_AccelDecelCountDown-- > 0) {
-				return m_IRQs_AtAccelDecel;
-			}
-
-			m_IRQs_AccelDecelCountDown = 5;
-
-			m_IRQs_AtAccelDecel--;
-			if (m_IRQs_AtAccelDecel == m_IRQs_PerStep)
-			{				
-				m_state = STATE_MOVING;
-			}				
-
-			return m_IRQs_AtAccelDecel;
-		case STATE_MOVING:
-			if (m_stepsRemaining == m_rampDelta)
-			{
-				m_IRQs_AccelDecelCountDown = 5;
-				m_state = STATE_DECELERATING;
-			}
-			
-			return m_IRQs_PerStep;
-		case STATE_DECELERATING:
-			while (m_IRQs_AccelDecelCountDown-- > 0) {
-				return m_IRQs_AtAccelDecel;
-			}
-
-			m_IRQs_AccelDecelCountDown = 5;
-
-
-			m_IRQs_AtAccelDecel++;
-			if (m_stepsRemaining == 0)
-			{
-				m_state = STATE_IDLE;
-			}
-
-			m_IRQs_AtAccelDecel = min(m_IRQs_AtAccelDecel, START_ENDING_FEED_RATE);
-
-			return 	m_IRQs_AtAccelDecel;
-	}
 
 	return m_IRQs_PerStep;
 
@@ -259,16 +212,59 @@ void A4988::ClearLimitSwitches() {
 #define BASE_STEP_INTERVAL ISR_INTERVAL_uSEC * 2
 
 void A4988::Update() {
-	if (!IsBusy) {
-		return;
-	}
-
 	//Spin until we should toggle.
 	if (m_IRQ_CurrentCountDown-- > 1) {
 		return;
 	}
 	else {
-		m_IRQ_CurrentCountDown = GetIRQs_PerStep();
+
+		switch (m_state)
+		{
+		case STATE_IDLE:
+			m_state = STATE_ACCELERATING;
+			m_rampDelta = 0;
+			break;
+		case STATE_ACCELERATING:
+			m_rampDelta++;
+
+			//while (m_IRQs_AccelDecelCountDown-- > 0) {
+				m_IRQ_CurrentCountDown = m_IRQs_AtAccelDecel;
+			//}
+
+			m_IRQs_AccelDecelCountDown = 5;
+
+			m_IRQs_AtAccelDecel--;
+			if (m_IRQs_AtAccelDecel == m_IRQs_PerStep)
+			{
+				m_state = STATE_MOVING;
+			}
+
+			m_IRQ_CurrentCountDown   = m_IRQs_AtAccelDecel;
+		case STATE_MOVING:
+			if (m_stepsRemaining == m_rampDelta)
+			{
+				m_IRQs_AccelDecelCountDown = 5;
+				m_state = STATE_DECELERATING;
+			}
+
+			m_IRQ_CurrentCountDown = m_IRQs_PerStep;
+		case STATE_DECELERATING:
+			//while (m_IRQs_AccelDecelCountDown-- > 0) {
+				m_IRQ_CurrentCountDown = m_IRQs_AtAccelDecel;
+			//}
+
+			m_IRQs_AccelDecelCountDown = 5;
+
+			m_IRQs_AtAccelDecel++;
+			if (m_stepsRemaining == 0)
+			{
+				m_state = STATE_IDLE;
+			}
+
+			m_IRQs_AtAccelDecel = min(m_IRQs_AtAccelDecel, START_ENDING_FEED_RATE);
+
+			m_IRQ_CurrentCountDown = m_IRQs_AtAccelDecel;
+		}
 	}
 
 	if (m_totalSteps > 0) {

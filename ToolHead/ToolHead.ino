@@ -214,29 +214,18 @@ void EnableTimer2() {
 bool toggled = false;
 
 ISR(TIMER1_COMPA_vect) {
-	//for (int idx = 0; idx < 4; ++idx) {
-	XAxis.Update();
-	YAxis.Update();
-	ZPaste.Update();
-	ZPlace.Update();
-	CAxis.Update();
-
-	if (toggled)
-		digitalWrite(16, LOW);
-	else
-		digitalWrite(16, HIGH);
-
-	toggled = !toggled;
-
-	//		delayMicroseconds(25);
-		//}
+	if (XAxis.IsBusy) XAxis.Update();
+	if (YAxis.IsBusy) YAxis.Update();
+	if (ZPaste.IsBusy) ZPaste.Update();
+	if (ZPlace.IsBusy) ZPlace.Update();
+	if (CAxis.IsBusy) CAxis.Update();
 }
 
 
 void setup() {
 	delay(1500);
 
-	Serial.begin(115200);
+	Serial.begin(230400);
 	Serial.println("online");
 
 	_state = "Idle";
@@ -401,6 +390,7 @@ void GetCommand()
 		Serial.print(",");
 		Serial.print(YAxis.GetCurrentLocation(), 2);
 		Serial.print(",");
+		delay(5);
 		Serial.print(ZPlace.GetCurrentLocation(), 2);
 		Serial.print(",");
 		Serial.print(ZPaste.GetCurrentLocation(), 2);
@@ -408,9 +398,10 @@ void GetCommand()
 		Serial.print(CAxis.GetCurrentLocation(), 2);
 		Serial.print(",T:" + _currentTool);
 		Serial.print(_currentTool);
-        Serial.print(",P:");
+		Serial.print(",P:");
 		Serial.print(_hasPart);
 		Serial.println(">");
+		delay(15);
 		Serial.print("<WPos:");
 		Serial.print(XAxis.GetWorkspaceOffset(), 2);
 		Serial.print(",");
@@ -422,7 +413,7 @@ void GetCommand()
 		Serial.print(",");
 		Serial.print(CAxis.GetWorkspaceOffset(), 2);
 		Serial.println(">");
-		delay(10);
+		delay(15);
 
 		return;
 	}
