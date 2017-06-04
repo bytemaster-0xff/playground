@@ -70,6 +70,7 @@ void A4988::Disable() {
 #define STATE_ACCELERATING 1
 #define STATE_MOVING 2
 #define STATE_DECELERATING 3
+#define STATE_COMPLETED 4
 
 
 #define DEFAULT_MM_PER_SECOND 125
@@ -225,12 +226,11 @@ void A4988::Update() {
 			m_rampDelta = 0;
 			break;
 		case STATE_ACCELERATING:
-			m_rampDelta++;
-
-			//while (m_IRQs_AccelDecelCountDown-- > 0) {
+			if (m_IRQs_AccelDecelCountDown-- > 0) {
 				m_IRQ_CurrentCountDown = m_IRQs_AtAccelDecel;
-			//}
-
+				return;
+			}
+			m_rampDelta++;
 			m_IRQs_AccelDecelCountDown = 5;
 
 			m_IRQs_AtAccelDecel--;
@@ -239,7 +239,8 @@ void A4988::Update() {
 				m_state = STATE_MOVING;
 			}
 
-			m_IRQ_CurrentCountDown   = m_IRQs_AtAccelDecel;
+			m_IRQ_CurrentCountDown = m_IRQs_AtAccelDecel;
+			break;
 		case STATE_MOVING:
 			if (m_stepsRemaining == m_rampDelta)
 			{
@@ -248,23 +249,25 @@ void A4988::Update() {
 			}
 
 			m_IRQ_CurrentCountDown = m_IRQs_PerStep;
+			break;
 		case STATE_DECELERATING:
-			//while (m_IRQs_AccelDecelCountDown-- > 0) {
+			if (m_IRQs_AccelDecelCountDown-- > 0) {
 				m_IRQ_CurrentCountDown = m_IRQs_AtAccelDecel;
-			//}
+				return;
+			}
 
 			m_IRQs_AccelDecelCountDown = 5;
 
 			m_IRQs_AtAccelDecel++;
-			if (m_stepsRemaining == 0)
-			{
-				m_state = STATE_IDLE;
-			}
-
-			m_IRQs_AtAccelDecel = min(m_IRQs_AtAccelDecel, START_ENDING_FEED_RATE);
-
 			m_IRQ_CurrentCountDown = m_IRQs_AtAccelDecel;
+			if(m_IRQs_AtAccelDecel == START_ENDING_FEED_RATE)			
+			{
+				m_state = STATE_COMPLETED;
+			}
+			
+			break;
 		}
+
 	}
 
 	if (m_totalSteps > 0) {

@@ -93,6 +93,13 @@ enum CommandTypes
 	Unknown
 };
 
+
+bool _topLightOn = false;
+bool _bottomLightOn = false;
+bool _vacuumOn = false;
+bool _exhaustOn = false;
+bool _suctionOn = false;
+
 int _currentTool = 0;
 #define TOOL_PLACE 0
 #define TOOL_PASTE 1
@@ -360,6 +367,8 @@ void ClearAlarmMode() {
 
 char _msgBuffer[256];
 
+int _sendWorkplaceDataCountDown = 0;
+
 void GetCommand()
 {
 	int ch = Serial.read();
@@ -385,34 +394,52 @@ void GetCommand()
 		Serial.println(_msgBuffer);*/
 
 		Serial.print("<" + _state + ",");
-		Serial.print("MPos:");
+		Serial.print("m:");
 		Serial.print(XAxis.GetCurrentLocation(), 2);
 		Serial.print(",");
 		Serial.print(YAxis.GetCurrentLocation(), 2);
 		Serial.print(",");
-		delay(5);
 		Serial.print(ZPlace.GetCurrentLocation(), 2);
 		Serial.print(",");
 		Serial.print(ZPaste.GetCurrentLocation(), 2);
 		Serial.print(",");
-		Serial.print(CAxis.GetCurrentLocation(), 2);
-		Serial.print(",T:" + _currentTool);
-		Serial.print(_currentTool);
-		Serial.print(",P:");
-		Serial.print(_hasPart);
+		Serial.print(CAxis.GetCurrentLocation(), 2);		
 		Serial.println(">");
-		delay(15);
-		Serial.print("<WPos:");
-		Serial.print(XAxis.GetWorkspaceOffset(), 2);
-		Serial.print(",");
-		Serial.print(YAxis.GetWorkspaceOffset(), 2);
-		Serial.print(",");
-		Serial.print(ZPlace.GetWorkspaceOffset(), 2);
-		Serial.print(",");
-		Serial.print(ZPaste.GetWorkspaceOffset(), 2);
-		Serial.print(",");
-		Serial.print(CAxis.GetWorkspaceOffset(), 2);
-		Serial.println(">");
+
+		if (_sendWorkplaceDataCountDown-- <= 0)
+		{
+			Serial.print("<w:");
+			Serial.print(XAxis.GetWorkspaceOffset(), 2);
+			Serial.print(",");
+			Serial.print(YAxis.GetWorkspaceOffset(), 2);
+			Serial.print(",");
+			Serial.print(ZPlace.GetWorkspaceOffset(), 2);
+			Serial.print(",");
+			Serial.print(ZPaste.GetWorkspaceOffset(), 2);
+			Serial.print(",");
+			Serial.print(CAxis.GetWorkspaceOffset(), 2);
+			Serial.println(">");
+
+			Serial.print("<TL:");
+			Serial.print(_topLightOn ? "1" : "0");
+			Serial.print(",BL:");
+			Serial.print(_bottomLightOn ? "1" : "0");
+			Serial.print(",VA:");
+			Serial.print(_vacuumOn ? "1" : "0");
+			Serial.print(",SU:");
+			Serial.print(_suctionOn ? "1" : "0");
+			Serial.print(",EX:");
+			Serial.print(_exhaustOn ? "1" : "0");
+			Serial.print(",TO:");
+			Serial.print(_currentTool);
+			Serial.print(",PA:0");
+			Serial.println(">");
+
+			_sendWorkplaceDataCountDown = 10;
+		}
+
+
+
 		delay(15);
 
 		return;
@@ -811,11 +838,11 @@ void ProcessCommand()
 		{
 		case 17: EnableMotors(); break;
 		case 18: DisableMotors(); break;
-		case 60: { digitalWrite(UPPER_LIGHT, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
-		case 61: { digitalWrite(LOWER_LIGHT, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
-		case 62: { digitalWrite(vACUUM_PUMP, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
-		case 63: { digitalWrite(SUCTION_SOLENOID, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
-		case 64: { digitalWrite(EXHUAST_SOLENOID, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
+		case 60: { digitalWrite(UPPER_LIGHT, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH);  _topLightOn = CommandBuffer[_commandBufferTail].PParameter != 0; } break;
+		case 61: { digitalWrite(LOWER_LIGHT, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); _bottomLightOn = CommandBuffer[_commandBufferTail].PParameter != 0; } break;
+		case 62: { digitalWrite(vACUUM_PUMP, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); _vacuumOn = CommandBuffer[_commandBufferTail].PParameter != 0; } break;
+		case 63: { digitalWrite(SUCTION_SOLENOID, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); _suctionOn = CommandBuffer[_commandBufferTail].PParameter != 0; } break;
+		case 64: { digitalWrite(EXHUAST_SOLENOID, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); _exhaustOn = CommandBuffer[_commandBufferTail].PParameter != 0; } break;
 		case 119: CheckEndStops(); break;
 		}
 		break;
