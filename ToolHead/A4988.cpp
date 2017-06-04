@@ -88,17 +88,15 @@ void A4988::Move(float cm, float feedMMMinute) {
 
 	float relativePosition = (m_currentMachineLocation - m_worksetOffset);
 
-	float delta = cm - relativePosition;
+	float delta =  m_absoluteMove ? cm - relativePosition : cm;
 
-	if (delta == 0)
+	m_stepsRemaining = abs(delta * STEPS_PER_MM);
+	if (m_stepsRemaining == 0)
 	{
 		return;
 	}
 
-	m_stepsRemaining = abs(delta * STEPS_PER_MM);
 	m_totalSteps = m_stepsRemaining;
-
-
 
 	m_requestedFeedRate_mmSeconds = feedMMMinute / 60.0;
 	m_IRQs_PerStep = ((int)DEFAULT_MM_PER_SECOND / m_requestedFeedRate_mmSeconds);
@@ -155,16 +153,20 @@ void A4988::Home() {
 	while (endStopHit == false)
 	{
 		digitalWrite(m_stepPin, HIGH);
-		delayMicroseconds(250);
+		delayMicroseconds(100);
 
 		digitalWrite(m_stepPin, LOW);
-		delayMicroseconds(250);
+		delayMicroseconds(100);
 
 		endStopHit = digitalRead(m_minLimitPin) == LOW;
 	}
 
 	m_bHoming = false;
 
+	m_currentMachineLocation = 0;
+}
+
+void A4988::ResetHomeLocation() {
 	m_currentMachineLocation = 0;
 }
 
@@ -176,6 +178,16 @@ void A4988::SetWorkspaceOffset(float value)
 {
 	m_worksetOffset = GetCurrentLocation() - value;
 	EEPROM.put(m_eepromStartAddr + EEPROM_WORKSPACEOFFSET, m_worksetOffset);
+}
+
+void A4988::SetRelativeCoordMove()
+{
+	m_absoluteMove = false;
+}
+
+void A4988::SetAbsoluteCoordMove()
+{
+	m_absoluteMove = true;
 }
 
 int A4988::GetIRQs_PerStep()

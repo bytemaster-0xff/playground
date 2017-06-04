@@ -19,6 +19,7 @@ private:
 	int m_state;
 	int m_temp1;
 	int m_rampDelta;
+	int m_absoluteMove = true;
 	float m_moveLength;
 	float m_requestedFeedRate_mmSeconds;
 	long m_stepsRemaining;
@@ -65,10 +66,13 @@ public:
 	void Kill();
 	void Disable();
 	void Home();
+	void ResetHomeLocation();
 	void ClearLimitSwitches();
 	void Update();
 	float GetWorkspaceOffset();
 	void SetWorkspaceOffset(float value);
+	void SetAbsoluteCoordMove();
+	void SetRelativeCoordMove();
 };
 
 #endif

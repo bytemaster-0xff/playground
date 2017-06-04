@@ -1,6 +1,7 @@
 
 #include <EEPROM.h>
 #include "A4988.h"
+
 #define DELAY_MICRO_SECONDS 5000
 
 #define SBI(n,b) (n |= _BV(b))
@@ -38,7 +39,11 @@
 
 #define UPPER_LIGHT 9
 #define LOWER_LIGHT 8
-#define SOLENOID 10
+
+#define vACUUM_PUMP 10
+
+#define SUCTION_SOLENOID 63
+#define EXHUAST_SOLENOID 40
 
 #define COMMAND_BUFFER_LENGTH 20
 #define GCODE_LINE_BUFFER_LENGTH 50
@@ -73,7 +78,6 @@ enum WordTypes
 	ExpectingXLocation,
 	ExpectingYLocation,
 	ExpectingZLocation,
-	ExpectingCLocation,
 	ExpectingILocation,
 	ExpectingJLocation,
 	ExpectingSParameter,
@@ -117,8 +121,6 @@ typedef struct GCodeCommand
 	bool HasYParameter;
 	float ZLocation;
 	bool HasZParameter;
-	float CLocation;
-	bool HasCParameter;
 	float ELocatoin;
 	bool HasELocation;
 
@@ -156,8 +158,6 @@ void ResetWord(int idx) {
 	CommandBuffer[idx].HasYParameter = false;
 	CommandBuffer[idx].ZLocation = 0;
 	CommandBuffer[idx].HasZParameter = false;
-	CommandBuffer[idx].CLocation = 0;
-	CommandBuffer[idx].HasCParameter = false;
 	CommandBuffer[idx].IParameter = 0;
 	CommandBuffer[idx].HasIParameter = false;
 	CommandBuffer[idx].JParameter = 0;
@@ -251,14 +251,14 @@ void setup() {
 	ZPlace.SetUpdatesPerCount(20);
 	ZPaste.SetMinLimitPin(SOLDERPASTEMAX);
 	ZPaste.SetUpdatesPerCount(20);
-
-	CAxis.SetMinLimitPin(PNPHEADMAX);
 	CAxis.SetUpdatesPerCount(5);
 
 	// put your setup code here, to run once:
 	pinMode(UPPER_LIGHT, OUTPUT);
 	pinMode(LOWER_LIGHT, OUTPUT);
-	pinMode(SOLENOID, OUTPUT);
+	pinMode(EXHUAST_SOLENOID, OUTPUT);
+	pinMode(SUCTION_SOLENOID, OUTPUT);
+	pinMode(vACUUM_PUMP, OUTPUT);
 
 	pinMode(XMAX, INPUT);
 	pinMode(XMIN, INPUT);
@@ -320,9 +320,6 @@ void ParseWord()
 	case ExpectingZLocation:
 		CommandBuffer[_commandBufferHead].ZLocation = atof(wordBuffer);
 		break;
-	case ExpectingCLocation:
-		CommandBuffer[_commandBufferHead].CLocation = atof(wordBuffer);
-		break;
 	case ExpectingPParameter:
 		CommandBuffer[_commandBufferHead].PParameter = atoi(wordBuffer);
 		CommandBuffer[_commandBufferHead].HasPParameter = true;
@@ -372,6 +369,7 @@ void ClearAlarmMode() {
 	_alarmCondition = false;
 }
 
+char _msgBuffer[256];
 
 void GetCommand()
 {
@@ -381,42 +379,51 @@ void GetCommand()
 		return;
 	}
 
-	//	Serial.print("IN LOOP: ");
-		//Serial.println((char) ch);
-
 	if (ch == '?')
 	{
-		Serial.print("<");
-		Serial.print(_state);
-		Serial.print(",");
+		/*char stateBuffer[20];
+		_state.toCharArray(stateBuffer, 20, 0);
+
+		sprintf(_msgBuffer, "<%s,MPos,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f,T:%i,P:%i>",
+			stateBuffer,
+			XAxis.GetCurrentLocation(), YAxis.GetCurrentLocation(), ZPlace.GetCurrentLocation(), ZPaste.GetCurrentLocation(), CAxis.GetCurrentLocation(), _currentTool, _hasPart);
+
+		Serial.println(_msgBuffer);
+
+		sprintf(_msgBuffer, "<WPos,%0.2f,%0.2f,%0.2f,%0.2f,%0.2f>",
+			XAxis.GetWorkspaceOffset(), YAxis.GetWorkspaceOffset(), ZPlace.GetWorkspaceOffset(), ZPaste.GetWorkspaceOffset(), CAxis.GetWorkspaceOffset());
+
+		Serial.println(_msgBuffer);*/
+
+		Serial.print("<" + _state + ",");
 		Serial.print("MPos:");
-		Serial.print(XAxis.GetCurrentLocation(), 4);
+		Serial.print(XAxis.GetCurrentLocation(), 2);
 		Serial.print(",");
-		Serial.print(YAxis.GetCurrentLocation(), 4);
+		Serial.print(YAxis.GetCurrentLocation(), 2);
 		Serial.print(",");
-		Serial.print(ZPlace.GetCurrentLocation(), 4);
+		Serial.print(ZPlace.GetCurrentLocation(), 2);
 		Serial.print(",");
-		Serial.print(ZPaste.GetCurrentLocation(), 4);
+		Serial.print(ZPaste.GetCurrentLocation(), 2);
 		Serial.print(",");
-		Serial.print(CAxis.GetCurrentLocation(), 4);
-		Serial.print(",");
-		Serial.print("WPos:");
-		Serial.print(XAxis.GetWorkspaceOffset(), 4);
-		Serial.print(",");
-		Serial.print(YAxis.GetWorkspaceOffset(), 4);
-		Serial.print(",");
-		Serial.print(ZPlace.GetWorkspaceOffset(), 4);
-		Serial.print(",");
-		Serial.print(ZPaste.GetWorkspaceOffset(), 4);
-		Serial.print(",");
-		Serial.print(CAxis.GetWorkspaceOffset(), 4);
-		Serial.print(",");
-		Serial.print("T:");
+		Serial.print(CAxis.GetCurrentLocation(), 2);
+		Serial.print(",T:" + _currentTool);
 		Serial.print(_currentTool);
-		Serial.print(",");
-		Serial.print("P:");
+        Serial.print(",P:");
 		Serial.print(_hasPart);
 		Serial.println(">");
+		Serial.print("<WPos:");
+		Serial.print(XAxis.GetWorkspaceOffset(), 2);
+		Serial.print(",");
+		Serial.print(YAxis.GetWorkspaceOffset(), 2);
+		Serial.print(",");
+		Serial.print(ZPlace.GetWorkspaceOffset(), 2);
+		Serial.print(",");
+		Serial.print(ZPaste.GetWorkspaceOffset(), 2);
+		Serial.print(",");
+		Serial.print(CAxis.GetWorkspaceOffset(), 2);
+		Serial.println(">");
+		delay(10);
+
 		return;
 	}
 	if (ch == '!' || ch == 0x18) {
@@ -527,15 +534,6 @@ void GetCommand()
 
 			_parserState = PendingNextWord;
 			break;
-		case 'C':
-			ParseWord();
-			CommandBuffer[_commandBufferHead].HasCParameter = true;
-			if (IsCurrentCommandMovement()) {
-				_wordType = ExpectingCLocation;
-			}
-
-			_parserState = PendingNextWord;
-			break;
 		case 'Z':
 			ParseWord();
 			CommandBuffer[_commandBufferHead].HasZParameter = true;
@@ -612,11 +610,10 @@ void GetCommand()
 void EnableMotors() {
 	GCodeCommand current = CommandBuffer[_commandBufferTail];
 
-	if (current.HasXParameter || current.HasYParameter || current.HasZParameter || current.HasCParameter)
+	if (current.HasXParameter || current.HasYParameter || current.HasZParameter)
 	{
 		if (current.HasXParameter) XAxis.Enable();
 		if (current.HasYParameter) YAxis.Enable();
-		if (current.HasCParameter) CAxis.Enable();
 		if (current.HasZParameter) {
 			switch (_currentTool) {
 			case TOOL_PLACE: ZPlace.Enable(); break;
@@ -638,7 +635,7 @@ void EnableMotors() {
 void DisableMotors() {
 	GCodeCommand current = CommandBuffer[_commandBufferTail];
 
-	if (current.HasXParameter || current.HasYParameter || current.HasZParameter || current.HasCParameter)
+	if (current.HasXParameter || current.HasYParameter || current.HasZParameter)
 	{
 		if (current.HasXParameter) XAxis.Disable();
 		if (current.HasYParameter) YAxis.Disable();
@@ -689,26 +686,15 @@ void Home() {
 
 void LinearMove() {
 	GCodeCommand current = CommandBuffer[_commandBufferTail];
-	unsigned long start = millis();
-
-	Serial.println(millis());
-
-	float xDelta = 0;
 
 	if (current.HasXParameter) {
-		xDelta = abs(current.XLocation - XAxis.GetCurrentLocation());
 		XAxis.Move(current.XLocation, current.Feed);
-		
 	}
 
-	float yDelta = 0;
-
 	if (current.HasYParameter) {
-		yDelta = abs(current.YLocation - YAxis.GetCurrentLocation());
 		YAxis.Move(current.YLocation, current.Feed);
 	}
 
-	
 	if (current.HasZParameter) {
 		switch (_currentTool)
 		{
@@ -722,30 +708,6 @@ void LinearMove() {
 	while (XAxis.IsBusy || YAxis.IsBusy || CAxis.IsBusy || ZPaste.IsBusy || ZPlace.IsBusy) {
 		GetCommand();
 	}
-
-	unsigned long delta = millis() - start;
-
-	Serial.println(millis());
-
-	if (xDelta > 0)
-	{
-		Serial.print("Feet Per Minute X: ");
-		Serial.print((xDelta / delta) * 60, 2);
-		Serial.println("ms");
-	}
-	
-	if (yDelta > 0)
-	{
-		Serial.print("Y:  ");
-		Serial.print(delta / 1000.0);
-		Serial.print("ms ");
-		Serial.print(yDelta, 2);
-		Serial.print("mm ");
-		Serial.print((yDelta / (delta / 1000.0)) * 60, 2);
-		Serial.print("mm/min ");
-		Serial.println("mm/min");
-	}
-
 }
 
 void SetWorkspaceLocation() {
@@ -759,18 +721,43 @@ void SetWorkspaceLocation() {
 		YAxis.SetWorkspaceOffset(current.YLocation);
 	}
 
-	if (current.HasCParameter) {
-		CAxis.SetWorkspaceOffset(current.CLocation);
-	}
-
 	if (current.HasZParameter) {
 		switch (_currentTool)
 		{
-		case TOOL_PLACE: ZPaste.SetWorkspaceOffset(current.CLocation); break;
-		case TOOL_PASTE: ZPlace.SetWorkspaceOffset(current.CLocation); break;
-		case TOOL_CAXIS: CAxis.SetWorkspaceOffset(current.CLocation); break;
-		}		
+		case TOOL_PLACE: ZPaste.SetWorkspaceOffset(current.ZLocation); break;
+		case TOOL_PASTE: ZPlace.SetWorkspaceOffset(current.ZLocation); break;
+		case TOOL_CAXIS: CAxis.SetWorkspaceOffset(current.ZLocation); break;
+		}
 	}
+}
+
+
+void SetHomeOffset() {
+	GCodeCommand current = CommandBuffer[_commandBufferTail];
+
+	if (current.HasXParameter) {
+		XAxis.ResetHomeLocation();
+	}
+
+	if (current.HasYParameter) {
+		YAxis.ResetHomeLocation();
+	}
+}
+
+void SetAbsoluteCoordSystem() {
+	XAxis.SetAbsoluteCoordMove();
+	YAxis.SetAbsoluteCoordMove();
+	ZPaste.SetAbsoluteCoordMove();
+	ZPlace.SetAbsoluteCoordMove();
+	CAxis.SetAbsoluteCoordMove();
+}
+
+void SetRelativeCoordSystem() {
+	XAxis.SetRelativeCoordMove();
+	YAxis.SetRelativeCoordMove();
+	ZPaste.SetRelativeCoordMove();
+	ZPlace.SetRelativeCoordMove();
+	CAxis.SetRelativeCoordMove();
 }
 
 void ArcMove() {
@@ -813,6 +800,9 @@ void ProcessCommand()
 		case 4: Dwell(); break;
 		case 10: SetWorkspaceLocation(); break;
 		case 28: Home(); break;
+		case 90: SetAbsoluteCoordSystem(); break;
+		case 91: SetRelativeCoordSystem(); break;
+		case 92: SetHomeOffset(); break;
 		}
 		break;
 
@@ -832,7 +822,9 @@ void ProcessCommand()
 		case 18: DisableMotors(); break;
 		case 60: { digitalWrite(UPPER_LIGHT, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
 		case 61: { digitalWrite(LOWER_LIGHT, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
-		case 62: { digitalWrite(SOLENOID, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
+		case 62: { digitalWrite(vACUUM_PUMP, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
+		case 63: { digitalWrite(SUCTION_SOLENOID, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
+		case 64: { digitalWrite(EXHUAST_SOLENOID, CommandBuffer[_commandBufferTail].PParameter == 0 ? LOW : HIGH); } break;
 		case 119: CheckEndStops(); break;
 		}
 		break;
