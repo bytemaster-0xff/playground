@@ -31,6 +31,7 @@ private:
 	int8_t m_eepromStartAddr;
 	int8_t m_timer = -1;
 	uint8_t m_dirPin;
+	uint8_t m_bEndStopCount;
 	uint8_t m_stepPin;
 	uint8_t m_enablePin;	
 	int8_t m_maxLimitPin = -1;

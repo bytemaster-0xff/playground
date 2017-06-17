@@ -1,3 +1,35 @@
+#define SERIAL_BUFFER_SIZE 768
+
+
+/* IMportant make sure we set the serial buffer a bit larger
+
+Make these changes to HardwareSerial.h
+
+#if ((RAMEND - RAMSTART) < 1023)
+#define SERIAL_TX_BUFFER_SIZE 16
+#else
+#define SERIAL_TX_BUFFER_SIZE 256
+#endif
+#endif
+#if !defined(SERIAL_RX_BUFFER_SIZE)
+#if ((RAMEND - RAMSTART) < 1023)
+#define SERIAL_RX_BUFFER_SIZE 16
+#else
+#define SERIAL_RX_BUFFER_SIZE 256
+#endif
+#endif
+#if (SERIAL_TX_BUFFER_SIZE>256)
+typedef uint16_t tx_buffer_index_t;
+#else
+typedef uint8_t tx_buffer_index_t;
+#endif
+#if  (SERIAL_RX_BUFFER_SIZE>256)
+typedef uint16_t rx_buffer_index_t;
+#else
+typedef uint8_t rx_buffer_index_t;
+#endif
+
+*/
 
 #include <EEPROM.h>
 #include "A4988.h"
@@ -45,9 +77,9 @@
 #define SUCTION_SOLENOID 63
 #define EXHUAST_SOLENOID 40
 
-#define COMMAND_BUFFER_LENGTH 20
+#define COMMAND_BUFFER_LENGTH 100
 #define GCODE_LINE_BUFFER_LENGTH 50
-#define WORD_BUFFER_LENGTH 10
+#define WORD_BUFFER_LENGTH 20
 
 #include "A4988.h"
 
@@ -196,11 +228,13 @@ void EnableTimer2() {
 	CBI(TCCR1A, WGM10);
 
 
-	OCR1A = 100;            // compare match register 16MHz/256/2Hz
+	OCR1A = 200;            // compare match register 16MHz/256/2Hz
 	//TCCR1B |= (1 << WGM12);   // CTC mode
 	TCCR1B |= (1 << CS11);    // 256 prescaler 
 	TIMSK1 |= (1 << OCIE1A);  // enable timer compare interrupt
 	interrupts();
+
+	pinMode(16, OUTPUT);
 }
 
 /*
@@ -221,11 +255,15 @@ void EnableTimer2() {
 bool toggled = false;
 
 ISR(TIMER1_COMPA_vect) {
+	digitalWrite(16, true);
+
 	if (XAxis.IsBusy) XAxis.Update();
 	if (YAxis.IsBusy) YAxis.Update();
 	if (ZPaste.IsBusy) ZPaste.Update();
 	if (ZPlace.IsBusy) ZPlace.Update();
 	if (CAxis.IsBusy) CAxis.Update();
+
+	digitalWrite(16, false);
 }
 
 
@@ -309,9 +347,17 @@ void ParseWord()
 		break;
 	case ExpectingXLocation:
 		CommandBuffer[_commandBufferHead].XLocation = atof(wordBuffer);
+		Serial.print("X===>");
+		Serial.print(wordBuffer);
+		Serial.print(" ");
+		Serial.println(CommandBuffer[_commandBufferHead].XLocation);
 		break;
 	case ExpectingYLocation:
 		CommandBuffer[_commandBufferHead].YLocation = atof(wordBuffer);
+		Serial.print("Y===>");
+		Serial.print(wordBuffer);
+		Serial.print(" ");
+		Serial.println(CommandBuffer[_commandBufferHead].YLocation);
 		break;
 	case ExpectingZLocation:
 		CommandBuffer[_commandBufferHead].ZLocation = atof(wordBuffer);
@@ -784,6 +830,7 @@ void ArcMove() {
 
 void Dwell() {
 	GCodeCommand current = CommandBuffer[_commandBufferTail];
+	delay(current.PParameter);
 }
 
 void CheckEndStops() {
@@ -803,6 +850,12 @@ void CheckEndStops() {
 
 void ProcessCommand()
 {
+	if (_alarmCondition)
+	{
+		_commandBufferTail = _commandBufferHead;
+		return;
+	}
+
 	GCodeCommand current = CommandBuffer[_commandBufferTail];
 	switch (current.CommandType)
 	{

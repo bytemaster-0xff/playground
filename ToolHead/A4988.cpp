@@ -64,6 +64,14 @@ void A4988::Disable() {
  *  Steps per MM           : 80
  *  Steps Per Second (max) : 125 = 10,000 / 80
  *  Max/Base Fed Rate      : 125
+
+ *  ISR Rate               : 100 uSec
+ *  Effectice Step Rate    : 200 uSec (two IRQs per step)
+ *  ISR's Per Second       : 5000 (5K)
+ *  Steps per MM           : 80
+ *  Steps Per Second (max) : 125 = 10,000 / 80
+ *  Max/Base Fed Rate      : 125
+
  */
 
 #define STATE_IDLE 0
@@ -83,6 +91,8 @@ void A4988::Disable() {
 /* Start out at 100mm / min, then decement / increment by one each delta */
 #define START_ENDING_FEED_RATE 15
 
+#define LOG_MOVE
+
 /* Feed arrives in mm/minute*/
 void A4988::Move(float cm, float feedMMMinute) {
 	Enable();
@@ -100,7 +110,8 @@ void A4988::Move(float cm, float feedMMMinute) {
 
 	m_totalSteps = m_stepsRemaining;
 
-	m_requestedFeedRate_mmSeconds = feedMMMinute / 60.0;
+	//m_requestedFeedRate_mmSeconds = feedMMMinute / 120.0;
+	m_requestedFeedRate_mmSeconds = feedMMMinute / 30.0;
 	m_IRQs_PerStep = ((int)DEFAULT_MM_PER_SECOND / m_requestedFeedRate_mmSeconds);
 	m_ForwardDirection = delta > 0;
 
@@ -270,7 +281,7 @@ void A4988::Update() {
 
 	}
 
-	if (m_totalSteps > 0) {
+	/*if (m_totalSteps > 0) {
 		float percentComplete = (m_totalSteps - m_stepsRemaining) / m_totalSteps;
 		float distanceMoved = m_moveLength * percentComplete;
 		if (m_ForwardDirection) {
@@ -279,14 +290,17 @@ void A4988::Update() {
 		else {
 			m_currentMachineLocation -= distanceMoved;
 		}
-	}
+	}*/
 
 	if (!m_ForwardDirection && m_minLimitPin != -1 && digitalRead(m_minLimitPin) == LOW)
 	{
 		if (!m_bHoming) {
-			Serial.println(String("<EndStop:" + m_axisName + ",min>"));
-			m_minSwitchTripped = true;
-			SetAlarmMode();
+			if (m_bEndStopCount++ > 10)
+			{
+				Serial.println(String("<EndStop:" + m_axisName + ",min>"));
+				m_minSwitchTripped = true;
+				SetAlarmMode();
+			}
 		}
 		else {
 			m_bHoming = false;
@@ -295,12 +309,23 @@ void A4988::Update() {
 
 		IsBusy = false;
 	}
+	else
+	{
+		m_bEndStopCount = 0;
+	}
 
 	if (m_ForwardDirection && m_maxLimitPin != -1 && digitalRead(m_maxLimitPin) == LOW)
 	{
-		Serial.println("<EndStop:" + m_axisName + ",max>");
-		IsBusy = false;
-		SetAlarmMode();
+		if (m_bEndStopCount++ > 10)
+		{
+			Serial.println("<EndStop:" + m_axisName + ",max>");
+			IsBusy = false;
+			SetAlarmMode();
+		}
+	}
+	else
+	{
+		m_bEndStopCount = 0;
 	}
 
 	if (m_lastToggleType == LOW) {
