@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.26730.16
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RabitMQTests", "RabitMQTests\RabitMQTests.csproj", "{A6BA590A-6EEC-4416-BE20-55FCF195A348}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Device", "Device\Device.csproj", "{51C59C25-F9AB-45F6-A8E3-65A5AA0B0B30}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A6BA590A-6EEC-4416-BE20-55FCF195A348}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6BA590A-6EEC-4416-BE20-55FCF195A348}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6BA590A-6EEC-4416-BE20-55FCF195A348}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6BA590A-6EEC-4416-BE20-55FCF195A348}.Release|Any CPU.Build.0 = Release|Any CPU
+		{51C59C25-F9AB-45F6-A8E3-65A5AA0B0B30}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51C59C25-F9AB-45F6-A8E3-65A5AA0B0B30}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{51C59C25-F9AB-45F6-A8E3-65A5AA0B0B30}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{51C59C25-F9AB-45F6-A8E3-65A5AA0B0B30}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {022F5C43-4D67-4336-84A0-D8FF70ECE947}
+	EndGlobalSection
+EndGlobal
