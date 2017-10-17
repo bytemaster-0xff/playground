@@ -19,7 +19,7 @@ namespace LagoVista.Net.LetsEncrypt.AcmeServices
         readonly IStorage _storage;
         readonly ILogger _logger;
 
-        public AcmeCertificateManager(IStorage storage, IAcmeSettings settings,  ILogger logger)
+        public AcmeCertificateManager(IStorage storage, IAcmeSettings settings)
         {
             _storage = storage;
             _settings = settings;

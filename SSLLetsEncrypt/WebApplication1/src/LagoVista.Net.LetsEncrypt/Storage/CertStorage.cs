@@ -8,6 +8,8 @@ namespace LagoVista.Net.LetsEncrypt.Storage
     {
         IAcmeSettings _settings;
 
+        private static string _response;
+
         public CertStorage(IAcmeSettings settings)
         {
             _settings = settings;
@@ -15,22 +17,33 @@ namespace LagoVista.Net.LetsEncrypt.Storage
 
         public Task<byte[]> GetCertAsync(string domainName)
         {
-            throw new NotImplementedException();
+            var fullPath = $@"X:\Temp\{domainName}.cer";
+            if(System.IO.File.Exists(fullPath))
+            {
+                return Task.FromResult( System.IO.File.ReadAllBytes(fullPath));
+            }
+
+            return Task.FromResult(default(byte[]));         
         }
 
         public Task<string> GetResponseAsync(string challenge)
         {
-            throw new NotImplementedException();
+            return Task.FromResult( _response);
         }
 
         public Task SetChallengeAndResponseAsync(string challenge, string response)
         {
-            throw new NotImplementedException();
+            _response = response;
+            return Task.FromResult(default(object));
         }
 
         public Task StoreCertAsync(string domainName, byte[] bytes)
         {
-            throw new NotImplementedException();
+            var fullPath = $@"X:\Temp\{domainName}.cer";
+
+            System.IO.File.WriteAllBytes(fullPath, bytes);
+
+            return Task.FromResult(default(object));
         }
     }
 }
