@@ -10,14 +10,23 @@ namespace LagoVisata.Net.LetsEncrypt.Sample
 {
     public class Program
     {
+        /* 
+         * Usage: start NGROK and point to port 5000 
+         * ngrok http 5000
+         */
+
+        private const string URI = "04a75263.ngrok.io";
+
         public static void Main(string[] args)
         {
             var settings = new AcmeSettings()
             {
                 EmailAddress = "kevinw@software-logistics.com",
+                StorageLocation = LagoVista.Net.LetsEncrypt.Interfaces.StorageLocation.FileSystem,
                 Development = true,
                 Diagnostics = true,
-                PfxPassword = "Test1234"
+                PfxPassword = "Test1234",
+                StoragePath = @"X:\Certs"
             };
 
             var acmeHost = new WebHostBuilder()
@@ -46,15 +55,14 @@ namespace LagoVisata.Net.LetsEncrypt.Sample
                 {
                     // Request a new certificate with Let's Encrypt and store it for next time
                     var certificateManager = options.ApplicationServices.GetService(typeof(ICertificateManager)) as ICertificateManager;
-                    var certificate = await certificateManager.GetCertificate("cdf8ac12.ngrok.io");
+                    var certificate = await certificateManager.GetCertificate(URI);
                     if (certificate != null)
                     {
                         options.UseHttps(certificate);
-                        Console.WriteLine("GOT CERT!");
                     }
                 })
                 .UseContentRoot(Directory.GetCurrentDirectory())
-                .UseUrls("https://849fbb6a.ngrok.io")
+                .UseUrls($"https://{URI}")
                 .UseApplicationInsights()
                 .Build();
 

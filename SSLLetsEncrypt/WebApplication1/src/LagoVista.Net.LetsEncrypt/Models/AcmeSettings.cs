@@ -21,6 +21,12 @@ namespace LagoVista.Net.LetsEncrypt.Models
 
         public TimeSpan RenewalPeriod { get; set; }
 
+        public StorageLocation StorageLocation { get; set; }
+
+        public string StorageContainerName { get; set; }
+
+        public string StoragePath { get; set; }
+
         public AcmeSettings()
         {
             RenewalPeriod = TimeSpan.FromDays(14);

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DependencyScanner": {
+      "commandName": "Project",
+      "commandLineArgs": "D:\\nuviot\\io.IoTEngine"
+    }
+  }
+}

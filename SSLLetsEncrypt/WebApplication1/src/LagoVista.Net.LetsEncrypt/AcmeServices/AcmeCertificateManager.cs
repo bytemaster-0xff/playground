@@ -23,7 +23,7 @@ namespace LagoVista.Net.LetsEncrypt.AcmeServices
         {
             _storage = storage;
             _settings = settings;
-        }
+         }
 
         public async Task<X509Certificate2> GetCertificate(string domainName)
         {
@@ -65,13 +65,13 @@ namespace LagoVista.Net.LetsEncrypt.AcmeServices
             account.Data.Agreement = account.GetTermsOfServiceUri();
             account = await client.UpdateRegistration(account);
 
-            var authz = await client.NewAuthorization(new AuthorizationIdentifier
+            var auth = await client.NewAuthorization(new AuthorizationIdentifier
             {
                 Type = AuthorizationIdentifierTypes.Dns,
                 Value = domainName
             });
 
-            var challenge = authz.Data.Challenges.Where(c => c.Type == ChallengeTypes.Http01).First();
+            var challenge = auth.Data.Challenges.Where(c => c.Type == ChallengeTypes.Http01).First();
             var response = client.ComputeKeyAuthorization(challenge);
             await _storage.SetChallengeAndResponseAsync(challenge.Token, response);
             var httpChallenge = await client.CompleteChallenge(challenge);

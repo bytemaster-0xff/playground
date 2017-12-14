@@ -10,8 +10,9 @@ namespace Microsoft.AspNetCore.Hosting
     {
         public static void AddAcmeCertificateManager(this IServiceCollection services, IAcmeSettings settings)
         {
+
             services.AddSingleton(settings);
-            services.AddTransient<IStorage, CertStorage>();
+            services.AddTransient<IStorage, LocalCertStorage>();
             services.AddSingleton<ICertificateManager, AcmeCertificateManager>();
         }
     }
