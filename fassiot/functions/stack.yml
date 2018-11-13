@@ -1,0 +1,8 @@
+provider:
+  name: faas
+  gateway: http://openfaas.iothost.net:8080
+functions:
+  hello-nuviot:
+    lang: csharp
+    handler: ./hello-nuviot/
+    image: faas-hello-nuviot

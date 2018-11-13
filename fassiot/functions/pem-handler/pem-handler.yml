@@ -1,0 +1,8 @@
+provider:
+  name: faas
+  gateway: http://openfaas.iothost.net:8080
+functions:
+  pem-handler:
+    lang: csharp
+    handler: ./pem-handler
+    image: bytemaster/pem-handler:latest
