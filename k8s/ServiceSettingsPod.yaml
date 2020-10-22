@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: 2018-12-19T10:03:00Z
+  name: settings-service-deployment
+  namespace: default
+  labels: 
+     app: nuviot
+     teir: serviceproviders
+spec:
+  replicas: 1     
+  selector:
+    matchLabels:
+      app: nuviot
+      teir: serviceproviders
+  template:
+    metadata:
+      labels:
+        app: nuviot
+        teir: serviceproviders
+        service: settings
+    spec:
+      containers:
+      - name: settings-service
+        image: nuviot/settings-service:v1.6.585.1514
+        env:
+          - name: AccessKey
+            valueFrom: 
+              secretKeyRef:
+                name: instance-secrets
+                key: AccessKey
+        envFrom:
+          - configMapRef:
+              name: instance-settings
+        ports:
+        - containerPort: 80
+      imagePullSecrets:
+      - name: docker-repo-secret     

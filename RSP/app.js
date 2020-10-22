@@ -1,7 +1,7 @@
 const net = require('net');
 const SerialPort = require('serialport')
 const Readline = require('@serialport/parser-readline')
-const port = new SerialPort("COM6", { baudRate: 115200 })
+const port = new SerialPort("/dev/ttyUSB0", { baudRate: 115200 })
 
 var HOST = '127.0.0.1';
 var PORT = 6969;
@@ -15,16 +15,22 @@ net.createServer(function(sock) {
     // Add a 'data' event handler to this instance of socket
     sock.on('data', function(data) {
       console.log('DATA ' + sock.remoteAddress + ': ' + data);
+      port.write(data);
       // Write the data back to the socket, the client will receive it as data from the server
       if(data != "?"){
         sock.write('You said "' + data + '"');
       }
     });
+
+    port.on('data', function(data) {
+	sock.write(data);
+    });
+    
     // Add a 'close' event handler to this instance of socket
    sock.on('close', function(data) {
      console.log('CLOSED: ' + sock.remoteAddress +' '+ sock.remotePort);
    });
   
-  }).listen(PORT, HOST);
+  }).listen(PORT);
   
   console.log('Server listening on ' + HOST +':'+ PORT);

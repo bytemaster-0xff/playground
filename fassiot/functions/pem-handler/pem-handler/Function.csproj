@@ -1,13 +1,17 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-  </PropertyGroup>
-  <PropertyGroup>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <LangVersion>7.1</LangVersion>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>root</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="LagoVista.Core" Version="2.1.533-beta0933" />
+    <PackageReference Include="LagoVista.IoT.DeviceAdmin" Version="2.1.533-beta0933" />
+    <PackageReference Include="LagoVista.IoT.DeviceManagement.Models" Version="2.1.533-beta0933" />
+    <PackageReference Include="LagoVista.IoT.DeviceMessaging.Models" Version="2.1.533-beta0933" />
+    <PackageReference Include="LagoVista.IoT.Logging" Version="2.1.533-beta0933" />
     <PackageReference Include="LagoVista.IoT.Runtime.Core" Version="2.1.533-beta0933" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.1-beta1" />
   </ItemGroup>

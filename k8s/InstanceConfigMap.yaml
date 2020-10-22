@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  creationTimestamp: 2018-12-19T10:03:00Z
+  name: instance-settings
+  namespace: default
+  labels: 
+    settingtype: instance
+data:
+  Environment: Development
+  InstanceId: "602CC37F46DA449B9B33CB9E99969EDD"
+  VersionId: "576ACDC27F3E4DFDB0569D5878C48816"
+  OrgId: C8AD4589F26842E7A1AEFBAEFC979C9B
+  SystemUsers__OrgId: C8AD4589F26842E7A1AEFBAEFC979C9B
+  SystemUsers__OrgName: "System Users"
+  SystemUsers__HostId: 084DC3A58A7E4E2EAC7EFE7AAE890A67
+  SystemUsers__HostName: "System Host Manager"
+  SystemUsers__InstanceUserId: "7BB6E00FDB8843068D8761A66FFE470B"
+  SystemUsers__InstanceUserName: "System Instance Manager"
+  Redis__Server: "redis-master"
+  Redis__Port: "6379"

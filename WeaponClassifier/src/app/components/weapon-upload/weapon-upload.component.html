@@ -1,0 +1,18 @@
+
+
+<div class="form-group">
+  <label for="file">Choose File</label>
+  <input type="file" id="file" (change)="handleFileInput($event.target.files)">
+</div>
+
+<button *ngIf="showUploadButton" class="btn btn-primary" (click)="uploadFileToActivity()">Upload</button>
+
+<div *ngIf="results">
+  <ol>
+    <li *ngFor="let result of results">{{ result.Tag}} - {{ result.Probability }} </li>
+  </ol>
+</div>
+
+<div *ngIf="busy">
+  Loading...
+</div>

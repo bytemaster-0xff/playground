@@ -1,0 +1,8 @@
+provider:
+  name: faas
+  gateway: http://openfaas.iothost.net:8080
+functions:
+  hello-there:
+    lang: csharp
+    handler: ./app/
+    image: bytemaster/hello-there

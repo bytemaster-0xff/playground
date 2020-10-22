@@ -1,0 +1,127 @@
+[
+    {
+        "Id": "sha256:1487cffabb92642c79d3bfb25851a3e2f71bde627b4cf6e9ddaeca41ea0e0b42",
+        "RepoTags": [
+            "bytemaster/hello-csharp:latest",
+            "bytemaster/hello-there:latest"
+        ],
+        "RepoDigests": [
+            "bytemaster/hello-csharp@sha256:adc16b24c513ab0fe16333cdb7d55f4857e293a4a84ea3318148e9ef38c130f1",
+            "bytemaster/hello-there@sha256:adc16b24c513ab0fe16333cdb7d55f4857e293a4a84ea3318148e9ef38c130f1"
+        ],
+        "Parent": "sha256:696aa3483d6e608b0073025beea6738ee0e95b13690b0c89ebbd95cb916c1d45",
+        "Comment": "",
+        "Created": "2018-11-13T22:03:08.9374652Z",
+        "Container": "c269ecac7f7f44878e796b95cc50f769a06388969d1871068c47f82bb9469480",
+        "ContainerConfig": {
+            "Hostname": "c269ecac7f7f",
+            "Domainname": "",
+            "User": "app",
+            "AttachStdin": false,
+            "AttachStdout": false,
+            "AttachStderr": false,
+            "ExposedPorts": {
+                "8080/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "ASPNETCORE_URLS=http://+:80",
+                "DOTNET_RUNNING_IN_CONTAINER=true",
+                "DOTNET_VERSION=2.1.5",
+                "fprocess=dotnet ./rootX.dll"
+            ],
+            "Cmd": [
+                "/bin/sh",
+                "-c",
+                "#(nop) ",
+                "CMD [\"fwatchdog\"]"
+            ],
+            "Healthcheck": {
+                "Test": [
+                    "CMD-SHELL",
+                    "[ -e /tmp/.lock ] || exit 1"
+                ],
+                "Interval": 3000000000
+            },
+            "ArgsEscaped": true,
+            "Image": "sha256:696aa3483d6e608b0073025beea6738ee0e95b13690b0c89ebbd95cb916c1d45",
+            "Volumes": null,
+            "WorkingDir": "/home/app",
+            "Entrypoint": null,
+            "OnBuild": null,
+            "Labels": {}
+        },
+        "DockerVersion": "18.06.1-ce",
+        "Author": "",
+        "Config": {
+            "Hostname": "",
+            "Domainname": "",
+            "User": "app",
+            "AttachStdin": false,
+            "AttachStdout": false,
+            "AttachStderr": false,
+            "ExposedPorts": {
+                "8080/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "ASPNETCORE_URLS=http://+:80",
+                "DOTNET_RUNNING_IN_CONTAINER=true",
+                "DOTNET_VERSION=2.1.5",
+                "fprocess=dotnet ./rootX.dll"
+            ],
+            "Cmd": [
+                "fwatchdog"
+            ],
+            "Healthcheck": {
+                "Test": [
+                    "CMD-SHELL",
+                    "[ -e /tmp/.lock ] || exit 1"
+                ],
+                "Interval": 3000000000
+            },
+            "ArgsEscaped": true,
+            "Image": "sha256:696aa3483d6e608b0073025beea6738ee0e95b13690b0c89ebbd95cb916c1d45",
+            "Volumes": null,
+            "WorkingDir": "/home/app/",
+            "Entrypoint": null,
+            "OnBuild": null,
+            "Labels": null
+        },
+        "Architecture": "amd64",
+        "Os": "linux",
+        "Size": 184694697,
+        "VirtualSize": 184694697,
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/6e0a0d1f18a89b3489daff01c5438b89ebf697acef0a372e569753f2097b34ad/diff:/var/lib/docker/overlay2/a1a96d6998dcaab3bcf44cb043551c033d25bd3d44a49d8df1753861b9e79867/diff:/var/lib/docker/overlay2/45ad4b8fe7e01405649d4b2cf736f031a6c3b1cdd572f52ce555b5d4aeb2f6af/diff:/var/lib/docker/overlay2/a9d002595f6ef9cd5ac0fa4aab4aeae37ddb5ef401588ccd139163eeb107e044/diff:/var/lib/docker/overlay2/ed8d3dce686e7de60661c6d38d612e21ccab4c2a0f1f5c6b672abf1b63928b95/diff:/var/lib/docker/overlay2/6ce10c22cc1242a431e48d131033b5409dab2b2f77f429fbbabe0c658d707bbe/diff:/var/lib/docker/overlay2/43d1cab5f5c2025fb7f67fbefae5d701bd508349af718bdf5093c9b2f80ff7e5/diff",
+                "MergedDir": "/var/lib/docker/overlay2/9178f5a9c9b5924fb07250a0b057a8c9e0e03bbc8ccea72e9534251187cc29e4/merged",
+                "UpperDir": "/var/lib/docker/overlay2/9178f5a9c9b5924fb07250a0b057a8c9e0e03bbc8ccea72e9534251187cc29e4/diff",
+                "WorkDir": "/var/lib/docker/overlay2/9178f5a9c9b5924fb07250a0b057a8c9e0e03bbc8ccea72e9534251187cc29e4/work"
+            },
+            "Name": "overlay2"
+        },
+        "RootFS": {
+            "Type": "layers",
+            "Layers": [
+                "sha256:237472299760d6726d376385edd9e79c310fe91d794bc9870d038417d448c2d5",
+                "sha256:3e992aa287e9a6b8fbe6514546afec9456408137c94c87f6e19ace109e5b5940",
+                "sha256:e67e29c967307874311a3877099984bc8e10fc980db23ae2bfb2d5845069f399",
+                "sha256:deb1fcb724d8ff6f427fe036c6a3d47ef59388bdb923fd678d4808c15281b7ed",
+                "sha256:8857762171ff80dab1e7f2b116e76b811e45d7cb54f08b8fee0a655c71430b9f",
+                "sha256:84882026dd81e3900117b2c11f1c63326c5839cc6405a94d66490844a1fb6528",
+                "sha256:5eeca47edc32f6b79182d530a3b8448fe932567d4783151a1b51a8f0077d38a5",
+                "sha256:d074face636e89d90a7900d64ce79a1f18b5530eef312d573f3de019bc994b1f"
+            ]
+        },
+        "Metadata": {
+            "LastTagTime": "2018-11-13T22:04:59.666028Z"
+        }
+    }
+]

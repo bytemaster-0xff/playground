@@ -10,6 +10,8 @@ namespace root
     class Program
     {
         private static string getStdin() {
+
+            return "foo";
             StringBuilder buffer = new StringBuilder();
             string s;
             while ((s = Console.ReadLine()) != null)
