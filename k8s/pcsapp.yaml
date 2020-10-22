@@ -1,0 +1,15 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: kdw-app
+spec:
+  containers:
+    - name: nginx
+      image: library/nginx
+      volumeMounts:
+      - mountPath: "/kevinwdata"
+        name: my-do-volume
+  volumes:
+    - name: my-do-volume
+      persistentVolumeClaim:
+        claimName: csi-pvc2

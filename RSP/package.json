@@ -1,0 +1,7 @@
+{
+    "name": "network-serial-adapter",
+    "versoin": "0.5.0",
+    "dependencies": {
+        "serialport": "9.0.2"
+    }
+}

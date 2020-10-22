@@ -1,0 +1,1 @@
+ helm upgrade openfaas --install openfaas/openfaas --namespace openfaas --set basic_auth=true --set functionNamespace=openfaas-fn --set serviceType=LoadBalancer
