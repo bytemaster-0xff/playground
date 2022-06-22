@@ -13,6 +13,6 @@
     <PackageReference Include="LagoVista.IoT.DeviceMessaging.Models" Version="2.1.533-beta0933" />
     <PackageReference Include="LagoVista.IoT.Logging" Version="2.1.533-beta0933" />
     <PackageReference Include="LagoVista.IoT.Runtime.Core" Version="2.1.533-beta0933" />
-    <PackageReference Include="Newtonsoft.Json" Version="12.0.1-beta1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
 </Project>
