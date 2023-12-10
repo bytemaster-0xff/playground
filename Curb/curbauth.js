@@ -15,6 +15,8 @@ function getCurbToken(userInfo, refreshTokenCb) {
     clientId = userInfo.curb_client_id;
     clientSecret = userInfo.curb_client_secret;
 
+    console.log(userInfo);
+
     request.post({
         url: 'https://energycurb.auth0.com/oauth/token',
         form:
