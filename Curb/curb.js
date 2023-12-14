@@ -31,8 +31,8 @@ var server = http.createServer(function (request, response)
         console.log("Curb onConnect");
 */
 const userInfo = {};
-userInfo.username = '***';
-userInfo.password = '***';
+userInfo.username = '**********';
+userInfo.password = '**********';
 userInfo.curb_client_id = 'iKAoRkr3qyFSnJSr3bodZRZZ6Hm3GqC3'
 userInfo.curb_client_secret = 'dSoqbfwujF72a1DhwmjnqP4VAiBTqFt3WLLUtnpGDmCf6_CMQms3WEy8DxCQR3KY'
 

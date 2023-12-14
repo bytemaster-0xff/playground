@@ -1,4 +1,3 @@
-
 var curbAccessToken;
 var curbRefreshToken;
 
@@ -7,14 +6,18 @@ var clientSecret;
 
 var locations;
 
+var nextSendTime = 0;
+
 var request = require('request');
 var io = require('socket.io-client');
+var version = require('./version');
 
 function getCurbToken(userInfo, refreshTokenCb) {
     console.log("Logging in to Curb");
     clientId = userInfo.curb_client_id;
     clientSecret = userInfo.curb_client_secret;
 
+    console.log(version);
     console.log(userInfo);
 
     request.post({
@@ -116,6 +119,8 @@ function getCurbLocations() {
 
 function postPowerConsumption(msg) {
     msg.msgid = 'power';
+    msg.version = version.version.version;
+    msg.timeStamp = new Date().toISOString();
     request.post({
         url: "http://lagovista.softwarelogistics.iothost.net:9000",
         json: msg
@@ -148,10 +153,10 @@ function connectToLiveData() {
         console.log("Error Message: " + json);
     });
     socket.on('data', function (data) {
+        if(nextSendTime < Date.now()) {
+
         let mainWatts = 0;
         let acWatts = 0;
-
-        console.log
 
         for (let idx = 0; idx < data.circuits.length; ++idx) {
             var postData = {};
@@ -166,6 +171,18 @@ function connectToLiveData() {
 
             if (data.circuits[idx].id === '21d49d68-4f3a-49e1-bc45-d939db6917b2') {
                 postData = { deviceid: 'poolHeater', watts: data.circuits[idx].w };
+            }
+
+            if (data.circuits[idx].id === '92885469-e589-4fa4-b916-eaf5e9e4758e') {
+                postData = { deviceid: 'lab', watts: data.circuits[idx].w };
+            }
+
+            if (data.circuits[idx].id === '5f25ad49-1f8c-4a3c-985b-f40f0d271531') {
+                postData = { deviceid: 'kdwoffice', watts: data.circuits[idx].w };
+            }
+
+            if (data.circuits[idx].id === 'f42bc047-c32c-4d1e-8474-cd5c1c3013e3') {
+                postData = { deviceid: 'wirecloset', watts: data.circuits[idx].w };
             }
 
             if (data.circuits[idx].id === '2029bd4a-b725-4efc-9226-c4dde4918881' ||
@@ -187,6 +204,9 @@ function connectToLiveData() {
         var mainPost = { deviceid: 'mainpower', watts: mainWatts };
         postPowerConsumption(mainPost);
         console.log("--------");
+
+        nextSendTime = Date.now() + 5000;
+        }
     });
     //socket.on('disconnect', connectToLiveData);
 }

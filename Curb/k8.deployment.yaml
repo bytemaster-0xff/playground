@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: curb-energy-sender-deployment
+  namespace: default
+  labels:
+     app: nuviot
+     tier: node-apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nuviot
+      tier: node-apps
+  template:
+    metadata:
+      labels:
+        app: nuviot
+        tier: node-apps
+        service: curb-energy-sender
+    spec:
+      containers:
+      - name: curb-energy-sender
+        image: nuviot/curb-energy-sender:v4.0.2402.1333
+      imagePullSecrets:
+      - name: docker-repo-secret
+
+
