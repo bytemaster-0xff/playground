@@ -1,4 +1,3 @@
-﻿using LagoVista.PickAndPlace.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -45,7 +44,7 @@ namespace LagoVista.PickAndPlace.LumenSupport
     }
 
 
-    public class PhotonProtocolHandler : IPhotonProtocolHandler
+    public class PhotonProtocolHandler
     {
         public byte packetID = 0;
 
